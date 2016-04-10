@@ -1,0 +1,74 @@
+venv
+.env
+
+
+# Compiled source #
+###################
+*.class
+__pycache__/
+*.py[cod]
+
+
+# javascript related #
+######################
+gen/
+.webassets-cache
+bower_components/
+node_modules/
+
+# IntelliJ #
+############
+.idea
+
+
+# Config files #
+################
+*.conf
+*.crt
+*.pem
+*.key
+
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+
+
+
+
+
+
+# PyInstaller #
+###############
+*.manifest
+*.spec
+
+
+# Installer logs #
+##################
+pip-log.txt
+pip-delete-this-directory.txt
+
+
+# Unit test / coverage reports #
+################################
+htmlcov/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+
+
+# OS generated folders #
+########################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
