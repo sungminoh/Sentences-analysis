@@ -7,41 +7,46 @@ drop table if exists sentences;
 drop table if exists posts;
 
 create table posts(
-    post_id int primary key auto_increment,
-    author varchar(255) character set utf8mb4,
+    _id int primary key auto_increment,
     url varchar(255) character set utf8mb4,
     title varchar(255) character set utf8mb4
 );
-create table sentences(
-    sentence_id int primary key auto_increment,
-    post_id int,
-    sentence_seq int,
-    content text character set utf8mb4,
-    foreign key (post_id) references posts(post_id)
-);
 create table words(
-    word_id int primary key auto_increment,
+    _id int primary key auto_increment,
     word varchar(255) character set utf8mb4
 );
 create table rulesets(
-    ruleset_id int primary key auto_increment,
+    _id int primary key auto_increment,
     name varchar(255) character set utf8mb4
 );
+
 create table rules(
-    rule_id int primary key auto_increment,
+    _id int primary key auto_increment,
     ruleset_id int,
-    foreign key (ruleset_id) references rulesets(ruleset_id)
+    full_text text character set utf8mb4,
+    foreign key (ruleset_id) references rulesets(_id)
+);
+create table sentences(
+    post_id int,
+    sentence_seq int,
+    full_text text character set utf8mb4,
+    primary key (post_id, sentence_seq),
+    foreign key (post_id) references posts(_id)
 );
 create table sentence_word_relations(
-    sentence_id int,
-    word_id int,
+    post_id int,
+    sentence_seq int,
     word_seq int,
-    foreign key (sentence_id) references sentences(sentence_id),
-    foreign key (word_id) references words(word_id)
+    word_id int,
+    primary key (post_id, sentence_seq, word_seq),
+    foreign key (post_id, sentence_seq) references sentences(post_id, sentence_seq),
+    foreign key (word_id) references words(_id)
 );
 create table rule_word_relations(
     rule_id int,
+    word_seq int,
     word_id int,
-    foreign key (rule_id) references rules(rule_id),
-    foreign key (word_id) references words(word_id)
+    primary key (rule_id, word_seq),
+    foreign key (rule_id) references rules(_id),
+    foreign key (word_id) references words(_id)
 );
