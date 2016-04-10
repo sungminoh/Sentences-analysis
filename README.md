@@ -37,18 +37,18 @@ _ _ _
 
 | API | Description | CRUD |
 |--------|--------|--------|
-| (posts) POST <br> /posts/{query}{source} | <ul><li>Crawl posts from the {source} with the {query}.</li><li>Parse the posts into sentences and morphemes.</li><li>Store all the results into the database.</li></ul>| <strong>C</strong> <ul><li>posts</li><li>sentences</li><li>words</li><li>entence_word_relations</li></ul>|
-| (posts) GET <br> /posts/{query} | <ul><li>Collect the posts related to the {query} from the database.</li></ul> | <strong>R</strong><ul><li>posts</li><li>sentences</li></ul> |
-| (posts) DELETE <br> /posts/{query} | <ul><li>Delete the posts related to the {query} from the database.</li></ul> | <strong>D</strong><ul><li>posts</li><li>sentences</li><li>sentence_word_relations</li></ul> |
-| (rulesets) POST <br> /rulesets/{name} | <ul><li>Create new ruleset.</li><li>Which is a kind of package of rules.</li></ul> | <strong>C</strong><ul><li>rulesets</li></ul> |
-| (rulesets) GET <br> /rulesets | <ul><li>Get all the rulesets from the database.</li></ul> | <strong>R</strong><ul><li>rulesets</li></ul> |
-| (rulesets) PUT <br> /rulesets/{id}{new_name} | <ul><li>Change the name of the ruleset.</li></ul> | <strong>U</strong><ul><li>rulesets</li></ul> |
-| (rulesets) DELETE <br> /rulesets/{id} | <ul><li>Delete the ruleset and realted rules.</li></ul> | <strong>D</strong><ul><li>rulesets</li><li>rules</li><li>rule_word_relations</li></ul> |
-| (rules) POST <br> /rulesets/{id}/rules/{fulltext} | <ul><li>Create new rule in the {ruleset}.</li><li>Parse the {fulltext} into morphemes.</li><li>Store the unregistered morphems into words table.</li><li>Get morphemes of the fulltext after parsing.</ul> | <strong>C</strong><ul><li>rules</li><li>words</li></ul> |
-| (rules) POST <br> /ruleset/{id}/words/{words} | <ul><li>Create an actual rule, combination of words.</li></ul> | <strong>C</strong><ul><li>rule_word_relations</li></ul> |
-| (rules) GET <br> /rulesets/{id} | <ul><li>Get rules of the selected rulset.</li></ul> | <strong>R</strong><ul><li>rulesets</li><li>rules</li></ul> |
-| (rules) PUT <br> /rules/{id}/words/{words} | <ul><li>Change the rule, combination of words.</li></ul> | <strong>R</strong><ul><li>rule_word_relations</li></ul> |
-| (rules) DELETE <br> /rules/{id} | <ul><li>Delete the rule, either fulltext and combination of words.</li></ul> | <strong>D</strong><ul><li>rules</li><li>rule_word_relations</li></ul> |
+| (topics) GET <br> /topics/ | <ul><li>Get all topics from the database.</li></ul> | <strong>R</strong><ul><li>topics</li></ul> |
+| (sources) GET <br> /sources/ | <ul><li>Get all sources from the database.</li></ul> | <strong>R</strong><ul><li>sources</li></ul> |
+| (rulesets) POST <br> /rulesets/{topic_id}/{ruleset_seq}/{name} | <ul><li>Create new ruleset.</li><li>Which is a kind of package of rules.</li></ul> | <strong>C</strong><ul><li>rulesets</li></ul> |
+| (rulesets) GET <br> /rulesets/{topic_id} | <ul><li>Get all the rulesets from the database.</li></ul> | <strong>R</strong><ul><li>rulesets</li></ul> |
+| (rulesets) PUT <br> /rulesets/{topic_id}/{ruleset_seq}/{new_name} | <ul><li>Change the name of the ruleset.</li></ul> | <strong>U</strong><ul><li>rulesets</li></ul> |
+| (rulesets) DELETE <br> /rulesets/{topic_id}/{ruleset_seq} | <ul><li>Delete the ruleset and its realted rules.</li></ul> | <strong>D</strong><ul><li>rulesets</li><li>rules</li><li>rule_word_relations</li></ul> |
+| (words) POST <br> /words/{fulltext} | <ul><li>Parse the {fulltext} into morphemes.</li><li>Store the unregistered morphems into words table.</li><li>Get morphemes of the fulltext after parsing.</ul> | <strong>C</strong><ul><li>words</li></ul> |
+| (rules) POST <br> /rules/{topic_id}/{ruleset_seq}/{fulltext}/{word_ids} | <ul><li>Create an actual rule, combination of words.</li></ul> | <strong>C</strong><ul><li>rules</li><li>rule_word_relations</li></ul> |
+| (rules) GET <br> /rules/{topic_id}/{ruleset_seq} | <ul><li>Get rules of the selected rulset.</li></ul> | <strong>R</strong><ul><li>rules</li><li>(rule_word_relations?)</li></ul> |
+| (rules) GET <br> /rules/{rule_id} | <ul><li>Get specific rule.</li></ul> | <strong>R</strong><ul><li>rules</li><li>rule_word_relations</li></ul> |
+| (rules) PUT <br> /rules/{rule_id}/{word_ids} | <ul><li>Change the rule, combination of words.</li></ul> | <strong>U</strong><ul><li>rule_word_relations</li></ul> |
+| (rules) DELETE <br> /rules/{rule_id} | <ul><li>Delete the rule, either fulltext and combination of words.</li></ul> | <strong>D</strong><ul><li>rules</li><li>rule_word_relations</li></ul> |
 
 
 
