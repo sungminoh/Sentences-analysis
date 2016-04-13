@@ -3,6 +3,7 @@ from konlpy.tag import Twitter
 from konlpy.tag import Kkma
 from konlpy.utils import pprint 
 from threading import Thread
+from more_itertools import unique_everseen
 import jpype
 import sys
 reload(sys)
@@ -10,6 +11,9 @@ sys.setdefaultencoding('utf-8')
 
 kkma = Kkma()
 twitter = Twitter()
+
+result_sentencing_thread = []
+result_parsing_thread = []
 
 def convert_textfile_to_lines(f):
     lines = []
@@ -33,7 +37,7 @@ def do_sentencing_by_threading(lines):
     t2 = Thread(target=do_sentencing, args=(int(nlines/2), nlines, lines, result_sentencing_thread))
     t1.start(); t2.start()
     t1.join(); t2.join()
-    jpype.detachThreadFromJVM()
+    # jpype.detachThreadFromJVM()
     return sum(sum(result_sentencing_thread, []), [])
 
 def do_sentencing_without_threading(lines):
@@ -51,27 +55,41 @@ def do_parsing_by_threading(sentences):
     t2 = Thread(target=do_parsing, args=(int(nsentences/2), nsentences, sentences, result_parsing_thread))
     t1.start(); t2.start()
     t1.join(); t2.join()
-    jpype.detachThreadFromJVM()
+    # jpype.detachThreadFromJVM()
     return sum(result_parsing_thread, [])
 
 def do_parsing_without_threading(sentences):
-    return [twitter.morphs(sentence) for sentence in sentences]
+    if type(sentences) is list:
+        return [twitter.pos(sentence) for sentence in sentences]
+    else:
+        return twitter.pos(sentences)
 
+def dedup(l):
+    return list(unique_everseen(l))
+
+def concate_tuple(t):
+    return '%s_%s' % t
+
+    
 if __name__=='__main__':
-    result_sentencing_thread = []
-    result_parsing_thread = []
 
     f = open('./dummy_article_03.txt')
 
     lines = convert_textfile_to_lines(f)
 
-    sentences = do_sentencing_by_threading(lines)
+    # sentences = do_sentencing_by_threading(lines)
     # sentences = do_sentencing_without_threading(lines)
+    sentences = '[ 천지 일보= 임 문식 기자] 4.13 총선을 나흘 남겨 둔 9일 여야 정치권이 20대 총선 성패를 좌우할 수도권 등 전국 곳곳에서 표 심 잡기에 집중, 사활을 건 유세전을 펼쳤다.'
     print "sentences"
     pprint(sentences)
 
-    morphs = do_parsing_by_threading(sentences)
-    # morphs = do_parsing_without_threading(sentences)
+
+    # morphs = do_parsing_by_threading(sentences)
+    morphs = do_parsing_without_threading(sentences)
     print "morphs"
+    pprint(morphs)
+
+    # morphs = [('a','1'), ('b','2')]
+    morphs = map(concate_tuple, morphs)
     pprint(morphs)
 

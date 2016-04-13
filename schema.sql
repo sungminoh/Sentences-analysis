@@ -5,6 +5,8 @@ drop table if exists rulesets;
 drop table if exists words;
 drop table if exists sentences;
 drop table if exists posts;
+drop table if exists topics;
+drop table if exists sources;
 
 /* [static] topic of an analysis */
 CREATE TABLE topics(

@@ -1,5 +1,6 @@
 venv
 .env
+.swp
 
 
 # Compiled source #

@@ -1,9 +1,18 @@
+# -*- coding: utf-8 -*-
 import MySQLdb as mdb
 import _mysql_exceptions
 import sys
 from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+from modules.parsing import convert_textfile_to_lines, do_sentencing_without_threading, do_parsing_without_threading,\
+                            dedup, concate_tuple
+from modules.crawling import crawl
 
 app = Flask(__name__)
+
 
 # Should be modified later. this is just from tutorial.
 app.config.update(dict(
@@ -32,8 +41,51 @@ def init_db():
                 if not query_line: break
                 query += query_line
                 if ';' in query:
+                    print query
                     cursor.execute(query)
+                    print 'Success'
                     query = ''
+    db.close()
+
+def tuplize(s):
+    return (s,)
+def store_posts():
+    db = connect_db()
+    files = crawl()
+    print files;
+    for fname in files:
+        cur = db.cursor()
+        f = open(fname)
+        print 'inserting %s' %fname
+
+        # insert post
+        add_post = 'INSERT INTO posts (url, title) VALUES (%s, %s)'
+        cur.execute(add_post, ('dummy', fname))
+        post_id = cur.lastrowid
+
+        lines = convert_textfile_to_lines(f)
+        sentences = do_sentencing_without_threading(lines)
+        for i in range (len(sentences)):
+            sentence = sentences[i]
+            # insert sentence
+            add_sentence = 'INSERT INTO sentences (post_id, sentence_seq, full_text) VALUES (%s, %s, %s)'
+            cur.execute(add_sentence, (post_id, i, sentence))
+
+            morphs = map(concate_tuple, do_parsing_without_threading(sentence))
+            morphs_dedup = map(tuplize, dedup(morphs)) # can be ignored. need to check
+            
+            # insert newly appeared words. if there already is, idk, maybe no inserting
+            add_word = 'INSERT IGNORE INTO words (word) VALUES (%s)'
+            cur.executemany(add_word, morphs_dedup)
+
+            
+            for j in range(len(morphs)):
+                add_relation = 'INSERT INTO sentence_word_relations (post_id, sentence_seq, word_seq, word_id) \
+                                SELECT %s, %s, %s, _id FROM words WHERE word = %s'
+                cur.execute(add_relation, (post_id, i, j, morphs[j]))
+
+        db.commit()    
+        print 'Done'
     db.close()
 
 @app.before_request
@@ -45,11 +97,11 @@ def teardown_request(exception):
     g.db.close()
 
 @app.route('/')
-def show_entries():
+def show_posts():
     cur = g.db.cursor()
-    cur.execute('select title, text from entries order by id desc')
+    cur.execute('select post_id, full_text from sentences')
     entries = [dict(title=row[0], text=row[1]) for row in cur.fetchall()]
-    return render_template('show_entries.html', entries=entries)
+    return render_template('show_posts.html', entries=entries)
 
 @app.route('/add', methods=['POST'])
 def add_entry():
@@ -84,5 +136,8 @@ def logout():
     return redirect(url_for('show_entries'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # init_db()
+    # store_posts()
+    # app.run(debug=True)
+    pass
 
