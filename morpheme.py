@@ -2,14 +2,15 @@
 import MySQLdb as mdb
 import _mysql_exceptions
 import sys
-from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash
+from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash, jsonify
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
-from modules.parsing import convert_textfile_to_lines, do_sentencing_without_threading, do_parsing_without_threading,\
-                            dedup, concate_tuple
+from modules.parsing import convert_textfile_to_lines, do_sentencing_without_threading, do_parsing_without_threading, dedup, concate_tuple, do_parsing_by_threading
 from modules.crawling import crawl
+
+import jpype
 
 app = Flask(__name__)
 
@@ -103,6 +104,12 @@ def show_posts():
     entries = [dict(title=row[0], text=row[1]) for row in cur.fetchall()]
     return render_template('show_posts.html', entries=entries)
 
+@app.route('/parsing', methods=['GET'])
+def parsing():
+    jpype.attachThreadToJVM()
+    text = request.args.get('text')
+    return jsonify(result=do_parsing_without_threading(text))
+    
 @app.route('/add', methods=['POST'])
 def add_entry():
     if not session.get('logged_in'):
@@ -138,6 +145,6 @@ def logout():
 if __name__ == '__main__':
     # init_db()
     # store_posts()
-    # app.run(debug=True)
-    pass
+    app.run(debug=True)
+    # pass
 

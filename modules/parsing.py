@@ -62,6 +62,7 @@ def do_parsing_without_threading(sentences):
     if type(sentences) is list:
         return [twitter.pos(sentence) for sentence in sentences]
     else:
+        jpype.attachThreadToJVM()
         return twitter.pos(sentences)
 
 def dedup(l):

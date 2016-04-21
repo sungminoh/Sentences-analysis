@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+        <meta name="description" content="SNS & article analyzing tool">
+        <meta name="author" content="Sungmin Oh">
+        <link rel="icon" href="../static/favicon.ico">
+
+        <title>문장 분석기</title>
+
+        <!-- Bootstrap core CSS -->
+        <link href="../static/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+        <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+        <link href="../static/bootstrap/ie10-viewport-bug-workaround.css" rel="stylesheet">
+
+        <!-- Custom styles for this template -->
+        <!--<link href="../static/show_posts.css" rel="stylesheet">-->
+
+        <script src="../static/bootstrap/ie-emulation-modes-warning.js"></script>
+        <!--<script src="{{ url_for('static', filename='ie-emulation-modes-warning.js') }}"></script>-->
+        <!--<script src="{{ url_for('static', filename='show_post.js') }}"></script>-->
+
+        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+            <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+        <![endif]-->
+    </head>
+
+    <body>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-sm-3 col-md-3 sidebar">
+                    <form class="nav nav-sidebar" action=""  method=get class=add-entry>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="rule_text" placeholder="Sentences">
+                            <span class="input-group-btn">
+                                <button class="btn btn-default" type="button" id="parse">Parse</button>
+                            </span>
+                        </div>
+                    </form>
+                    <div class="nav nav-sidebar">
+                        <div class="form-group col-lg-10" id="checkboxes">
+                        </div>
+                        <!--<button class="btn btn-default" type"button" id="register">Register</button>-->
+                    </div>
+
+                    <ul class="nav nav-sidebar" id='rules'>
+                        <li class="active"><a href="#">Overview <span class="sr-only">(current)</span></a></li>
+                        <li><a href="#">Reports</a></li>
+                        <li><a href="#">Analytics</a></li>
+                        <li><a href="#">Export</a></li>
+                    </ul>
+                </div>
+                <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+                    <h1 class="page-header">Dashboard</h1>
+
+                    <div class="row placeholders">
+                    </div>
+
+                    <h2 class="sub-header">Section title</h2>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>title</th>
+                                    <th>test</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in entries %}
+                                <tr>
+                                    <td>{{entry.title}}</td>
+                                    <td>{{entry.text}}</td>
+                                </tr>
+                                {% endfor %}
+                           </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bootstrap core JavaScript
+            ================================================== -->
+            <!-- Placed at the end of the document so the pages load faster -->
+            <!--<script type="test/javascript" src="{{ url_for('static', filename='jquery-1.12.3.min.js') }}"></script>-->
+            <script src="../static/jquery/jquery-1.12.3.min.js"></script>
+            <!--<script>window.jQuery || document.write('<script src="../static/jquery/jquery-1.12.3.min.js"><\/script>')</script>-->
+            <!--<script type="test/javascript" src="{{ url_for('static', filename='bootstrap.min.js') }}"></script>-->
+            <script src="../static/bootstrap/js/bootstrap.min.js"></script>
+             <!--IE10 viewport hack for Surface/desktop Windows 8 bug -->
+            <!--<script type="test/javascript" src="{{ url_for('static', filename='ie10-viewport-bug-workaround.js"') }}"></script>-->
+            <script src="../static/bootstrap/ie10-viewport-bug-workaround.js"></script>
+
+            <script src="../static/show_posts.js"></script>
+    </body>
+</html>
+
+

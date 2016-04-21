@@ -1,0 +1,9 @@
+Flask==0.10.1
+itsdangerous==0.24
+Jinja2==2.8
+JPype1==0.6.1
+konlpy==0.4.4
+MarkupSafe==0.23
+more-itertools==2.2
+MySQL-python==1.2.5
+Werkzeug==0.11.5
