@@ -20,8 +20,8 @@ def convert_textfile_to_lines(f):
     while(True):
         line = f.readline()
         if not line: break
-        line = u'%s' % line.strip()
-        if line == '': continue
+        line = u'%s' % line
+        if line.strip() == '': continue
         lines.append(line)
     return lines
 
@@ -41,7 +41,15 @@ def do_sentencing_by_threading(lines):
     return sum(sum(result_sentencing_thread, []), [])
 
 def do_sentencing_without_threading(lines):
-    return sum([kkma.sentences(line) for line in lines], [])
+    ret = []
+    for line in lines:
+        striped_line = line.strip()
+        if len(line) != len(striped_line):
+            remainder = line[len(striped_line):]
+        sentences = kkma.sentences(line)
+        sentences[-1] += remainder
+        ret += sentences
+    return ret
 
 def do_parsing(start, end, sentences, result_parsing_thread):
     jpype.attachThreadToJVM()

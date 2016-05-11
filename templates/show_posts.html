@@ -38,7 +38,8 @@
 
     <body style data-feedly-mini="yes">
         <!-- navigation bar -->
-        <nav class="navmenu navmenu-default navmenu-fixed-left offcanvas-sm" role="navigation">
+        <!--<nav class="navmenu navmenu-default navmenu-fixed-left offcanvas-sm" role="navigation"> temporary for developing-->
+        <nav class="navmenu navmenu-default navmenu-fixed-left" role="navigation">
             <a class="navmenu-brand" href="/">문장 분석기</a>
             <ul class="nav navmenu-nav">
                 <div id="topic-source-div">
@@ -89,7 +90,7 @@
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
-                        <h4 class="modal-title" id="exampleModalLabel">New rule</h4>
+                        <h4 class="modal-title">New rule</h4>
                     </div>
                     <div class="modal-body">
                         <form>
@@ -124,12 +125,13 @@
                 </div>
 
                 <h2 class="sub-header">Section title</h2>
+                <!-- post table -->
                 <div class="table-responsive">
                     <table class="table table-striped">
                         <thead>
                             <tr>
                                 <th>title</th>
-                                <th>test</th>
+                                <th>url</th>
                             </tr>
                         </thead>
                         <tbody id="posts">
@@ -139,6 +141,42 @@
                                 <td>{{entry.text}}</td>
                             </tr>
                             {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <!-- post detail modal -->
+                <div class="modal fade" id="post-modal" tabindex="-1" role="dialog" aria-labelledby="post-modal-label" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                                <h4 class="modal-title" id="post-modal-header-h4">
+                                    <!-- post title -->
+                                </h4>
+                            </div>
+                            <div class="modal-body">
+                                <!-- post detail -->
+                                <p id="post-modal-body-p">
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- sentence rule detail popover -->
+                <div class="panel panel-default popover" id="sentence-detail-popover">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Ruleset</th>
+                                <th>Rule text</th>
+                                <th>Rule words</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sentence-detail-popover-tbody">
                         </tbody>
                     </table>
                 </div>
