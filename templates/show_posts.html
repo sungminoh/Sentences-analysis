@@ -121,10 +121,10 @@
             <div>
                 <h1 class="page-header">Dashboard</h1>
 
-                <div class="row placeholders">
+                <div class="chart" id="chart">
                 </div>
 
-                <h2 class="sub-header">Section title</h2>
+                <h1 class="sub-header">Posts</h2>
                 <!-- post table -->
                 <div class="table-responsive">
                     <table class="table table-striped">
@@ -132,6 +132,7 @@
                             <tr>
                                 <th>title</th>
                                 <th>url</th>
+                                <th>count</th>
                             </tr>
                         </thead>
                         <tbody id="posts">
@@ -157,6 +158,8 @@
                                 </h4>
                             </div>
                             <div class="modal-body">
+                                <div class="chart" id="post-modal-chart">
+                                </div>
                                 <!-- post detail -->
                                 <p id="post-modal-body-p">
                                 </p>
@@ -172,11 +175,12 @@
                         <thead>
                             <tr>
                                 <th>Ruleset</th>
-                                <th>Rule text</th>
+                                <!-- <th>Rule text</th> -->
                                 <th>Rule words</th>
                             </tr>
                         </thead>
                         <tbody id="sentence-detail-popover-tbody">
+                            <!-- sentence popover -->
                         </tbody>
                     </table>
                 </div>
@@ -190,6 +194,8 @@
             <script src="../static/bootstrap/js/bootstrap.min.js"></script>
             <script type"text/javascript" src="../static/bootstrap_select/bootstrap-select.min.js"></script>
             <script type"text/javascript" src="../static/jasny_bootstrap/jasny-bootstrap.min.js"></script>
+            <!-- google chart -->
+            <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
              <!--IE10 viewport hack for Surface/desktop Windows 8 bug -->
             <script src="../static/bootstrap/ie10-viewport-bug-workaround.js"></script>
 

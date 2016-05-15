@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+
+from konlpy.utils import pprint 
 import MySQLdb as mdb
 import redis
 import _mysql_exceptions
@@ -54,6 +56,8 @@ queries = {
                                      JOIN (%s) AS r ON s.post_id = r.post_id AND s.sentence_seq = r.sentence_seq \
                                      WHERE r.post_id = %s \
                                      ORDER BY rnum ASC',
+    # param: topic, sentence_seqs
+    'get_post_sentences_rel'    :   'select post_id, sentence_seq from (%s) as t WHERE rnum in (%s)',
 
     # param: word
     'add_word'                  :   'INSERT IGNORE INTO words (word) VALUES (%s)',
@@ -111,8 +115,8 @@ queries = {
                                            JOIN words AS w ON r.word_id = w._id) AS t \
                                      GROUP BY word_id', # for redis
     # param: topic_id
-    'get_rule_words'            :   'SELECT rule_id, (MAX(word_seq) - MIN(word_seq)) AS gap, GROUP_CONCAT(word_id SEPARATOR ",") AS words \
-                                     FROM (SELECT rw.rule_id, rw.word_seq, rw.word_id \
+    'get_rule_words'            :   'SELECT category_seq, rule_id, (MAX(word_seq) - MIN(word_seq)) AS gap, GROUP_CONCAT(word_id ORDER BY word_seq SEPARATOR ",") AS words \
+                                     FROM (SELECT r.category_seq, rw.rule_id, rw.word_seq, rw.word_id \
                                            FROM rule_word_relations AS rw \
                                            JOIN rules AS r ON r._id = rw.rule_id \
                                            WHERE r.topic_id = %s \
@@ -149,7 +153,7 @@ queries = {
                                            WHERE p.topic_id = %s AND p.source_id IN (%s)) AS t, \
                                      (SELECT @rnum:=0) AS r',
     # param: queries[get_sentence_words], queries[get_sentences_rnum]
-    'get_sentence_words_rnum'   :   'SELECT r.rnum as sentence_id, t.word_seqs, t.word_ids \
+    'get_sentence_words_rnum'   :   'SELECT r.post_id, r.rnum as sentence_id, t.word_seqs, t.word_ids \
                                      FROM (%s) AS t \
                                      JOIN (%s) AS r \
                                      ON t.post_id = r.post_id AND t.sentence_seq = r.sentence_seq'
@@ -258,7 +262,7 @@ def teardown_request(exception):
     g.db.close()
 
 @app.route('/')
-def show_posts():
+def initialize_page():
     cur = g.db.cursor()
     cur.execute(queries['get_topics'])
     topics = [dict(id=int(row[0]), name=row[1]) for row in cur.fetchall()]
@@ -275,25 +279,23 @@ def posts():
         db = g.db
         cur = db.cursor()
 
-        cur.execute(queries['get_posts'] %('%s', format_string), [topic] + sources_ids)
+        cur.execute(queries['get_posts'] %('%s', format_string), [topic] + sources_ids) 
         posts = [dict(id=int(row[0]), title=row[1], url=row[2]) for row in cur.fetchall()]
 
         cur.execute(queries['get_rulesets'], (topic, ))
-        # rulesets = [dict(category_seq=int(row[0]), name=row[1]) for row in cur.fetchall()]
-        rulesets = []
-        category_seqs = []
-        for row in cur.fetchall():
-            rulesets.append(dict(category_seq=int(row[0]), name=row[1]))
-            category_seqs.append(int(row[0]))
+        rulesets = [dict(category_seq=int(row[0]), name=row[1]) for row in cur.fetchall()]
 
         ruleset_rules_dic = {}
-        for category_seq in category_seqs:
+        rule_ruleset_dic = {}
+        for ruleset in rulesets:
+            category_seq = ruleset['category_seq']
             cur.execute(queries['get_rules'], (topic, category_seq))
             rule_dic = {}
             for row in cur.fetchall():
                 rule_id = int(row[0])
                 full_text, word = row[1:]
                 word = word[:word.rindex('_')]
+                rule_ruleset_dic[rule_id] = category_seq
                 if rule_id not in rule_dic:
                     rule_dic[rule_id] = (full_text, [word])
                 else:
@@ -303,7 +305,35 @@ def posts():
 
         rd = g.rd
         rule_count_dic = {key: rd.bitcount(key) for key in rd.keys()}
-        return jsonify(posts=posts, rulesets=rulesets, ruleset_rules_dic=ruleset_rules_dic, rule_count_dic=rule_count_dic)
+        post_ruleset_count_dic = {}
+
+        for rule_id in rd.keys():
+            rule_id = int(rule_id)
+            category_seq = rule_ruleset_dic[rule_id]
+            sentence_ids = retrieve_sentence_ids(rd, rule_id)
+            if not sentence_ids: continue
+            format_string_sentence_ids = ', '.join(['%s']*len(sentence_ids))
+            cur.execute(queries['get_post_sentences_rel']%(queries['get_sentences_rnum'], '%s')
+                                                         %('%s', format_string, format_string_sentence_ids),
+                        [topic] + sources_ids + sentence_ids)
+            for row in cur.fetchall():
+                post_id = int(row[0])
+                sentence_seq = int(row[1])
+                if post_id in post_ruleset_count_dic:
+                    category_count_dic = post_ruleset_count_dic[post_id]
+                    if category_seq in category_count_dic:
+                        category_count_dic[category_seq] += 1
+                    else:
+                        category_count_dic[category_seq] = 1
+                else:
+                    post_ruleset_count_dic[post_id] = {category_seq: 1}
+
+        return jsonify(posts                    = posts, \
+                       rulesets                 = rulesets, \
+                       ruleset_rules_dic        = ruleset_rules_dic, \
+                       rule_count_dic           = rule_count_dic, \
+                       post_ruleset_count_dic   = post_ruleset_count_dic)
+
 
 @app.route('/_sentences', methods=['GET'])
 def sentences():
@@ -396,36 +426,17 @@ def rules():
         cur.execute(queries['del_rule'], (rule_id, ))
         db.commit()
         return jsonify(deleted=dict(rule_id=rule_id))
-    # if request.method == 'GET':
-        # topic = ast.literal_eval(request.args.get('topic'))
-        # category_seq = ast.literal_eval(request.args.get('category_seq'))
-        # cur.execute(queries['get_rules'], (topic, category_seq))
-        # rulesDic = {}
-        # rule_count_dic = {}
-        # for row in cur.fetchall():
-            # rule_id = int(row[0])
-            # full_text, word = row[1:]
-            # word = word[:word.rindex('_')]
-            # if rule_id not in rulesDic:
-                # rulesDic[rule_id] = (full_text, [word])
-                # rule_count_dic[str(rule_id)] = 0
-            # else:
-                # rulesDic[rule_id][1].append(word)
-        # rules = [dict(rule_id=int(key), full_text=val[0], word=val[1]) for key, val in rulesDic.iteritems()]
-        # rd = g.rd
-        # for key in rd.keys():
-            # rule_count_dic[key] = rd.bitcount(key)
-        # print rule_count_dic
-        # return jsonify(rules=rules, rule_count_dic=rule_count_dic)
 
 # not used
 def retrieve_sentence_ids(rd, key):
     ret = []
+    rd.set('tmp', rd.get(key))
     while(True):
-        pos = rd.bitpos(key, 1)
+        pos = rd.bitpos('tmp', 1)
         if pos < 0: break
-        ret.append(pos)
-        rd.setbit(key, pos, 0)
+        ret.append(int(pos))
+        rd.setbit('tmp', pos, 0)
+    rd.delete('tmp')
     return ret
 
 def is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
@@ -467,12 +478,14 @@ def run():
         cur.execute(queries['get_rule_words'], (topic, ))
 
         rule_count_dic = {}
+        post_ruleset_count_dic = {}
         valid_sentences = []
         for row_rule in cur.fetchall():
-            rule_id = int(row_rule[0])
+            category_seq = int(row_rule[0])
+            rule_id = int(row_rule[1])
             pipe.setbit(rule_id, 0, 0)
-            gap = int(row_rule[1])
-            rule_word_ids = map(int, row_rule[2].split(','))
+            gap = int(row_rule[2])
+            rule_word_ids = map(int, row_rule[3].split(','))
             rule_word_id_format_string = ', '.join(['%s']*len(rule_word_ids))
             cur.execute(queries['get_sentence_words_rnum']%(queries['get_sentence_words'], queries['get_sentences_rnum'])
                                                            %('%s', source_format_string, rule_word_id_format_string, rule_word_id_format_string, '%s', \
@@ -480,16 +493,29 @@ def run():
                         [topic] + sources_ids + rule_word_ids + rule_word_ids + [len(rule_word_ids)] + [topic] + sources_ids)
             del valid_sentences[:]
             for row_sentence in cur.fetchall():
-                sentence_id = int(row_sentence[0])
-                word_seqs = map(int, row_sentence[1].split(','))
-                sentence_word_ids = map(int, row_sentence[2].split(','))
+                post_id = int(row_sentence[0])
+                sentence_id = int(row_sentence[1])
+                word_seqs = map(int, row_sentence[2].split(','))
+                sentence_word_ids = map(int, row_sentence[3].split(','))
+                if rule_id == 72:
+                    print "post_id: %s \nsenence_id: %s\nword_seqs: %s\nsentence_word_ids: %s\ngap: %s\nrule_word_ids: %s" %(post_id, sentence_id, word_seqs, sentence_word_ids, gap, rule_word_ids)
                 if is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
+                    if rule_id == 72: print "valid"
                     valid_sentences.append(sentence_id)
+                    if post_id in post_ruleset_count_dic:
+                        category_count_dic = post_ruleset_count_dic[post_id]
+                        if category_seq in category_count_dic:
+                            category_count_dic[category_seq] += 1
+                        else:
+                            category_count_dic[category_seq] = 1
+                    else:
+                        post_ruleset_count_dic[post_id] = {category_seq: 1}
+
             for sentence_id in valid_sentences:
                 pipe.setbit(rule_id, sentence_id, 1)
             rule_count_dic[rule_id] = len(valid_sentences)
         pipe.execute()
-    return jsonify(rule_count_dic=rule_count_dic)
+    return jsonify(rule_count_dic=rule_count_dic, post_ruleset_count_dic=post_ruleset_count_dic)
 
 if __name__ == '__main__':
     # init_db()
