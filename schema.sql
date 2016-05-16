@@ -34,6 +34,7 @@ CREATE TABLE posts(
     source_id INT,
     title VARCHAR(255) CHARACTER SET UTF8MB4,
     url TEXT CHARACTER SET UTF8MB4,
+    timestamp TIMESTAMP NULL,
     FOREIGN KEY (topic_id) REFERENCES topics(_id),
     FOREIGN KEY (source_id) REFERENCES sources(_id)
 );

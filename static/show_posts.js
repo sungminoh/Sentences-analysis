@@ -158,6 +158,7 @@ var show_posts = function(posts){
         var post_id = this.id;
         var title = this.title;
         var url = this.url;
+        var timestamp = this.timestamp;
         $('#posts').append(
                 $('<tr>').prepend(
                 $('<td>').append(
@@ -169,7 +170,7 @@ var show_posts = function(posts){
                         'data-target':'#post-modal'
                     }).text(title)
                 ),
-                $('<td>').text(url),
+                $('<td>').text(timestamp),
                 $('<td>').attr({
                     'name':'post-td',
                     'id':'post-td-'+post_id

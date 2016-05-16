@@ -40,12 +40,12 @@ queries = {
     'get_sources'               :   'SELECT _id, name FROM sources',
 
     # param: topic_id, source_id, title, url
-    'add_post'                  :   'INSERT INTO posts (topic_id, source_id, title, url) VALUES (%s, %s, %s, %s)',
+    'add_post'                  :   'INSERT INTO posts (topic_id, source_id, title, url, timestamp) VALUES (%s, %s, %s, %s, %s)',
     # param: topic_id, source_ids_string
     'get_posts_'                :   'SELECT B._id, A.full_text FROM sentences AS A INNER JOIN posts AS B ON A.post_id = B._id \
                                      WHERE B.topic_id = %s and B.source_id IN (%s)', # not used
     # param: topic_id, source_ids_string
-    'get_posts'                 :   'SELECT _id, title, url FROM posts WHERE topic_id = %s and source_id IN (%s)',
+    'get_posts'                 :   'SELECT _id, title, url, timestamp FROM posts WHERE topic_id = %s and source_id IN (%s)',
 
     # param: post_id, sentence_seq, full_text
     'add_sentence'              :   'INSERT INTO sentences (post_id, sentence_seq, full_text) VALUES (%s, %s, %s)',
@@ -171,6 +171,8 @@ def connect_redis():
 
 # Only execute at the first time.
 def init_db():
+    rd = connect_redis()
+    rd.flushall()
     db = connect_db()
     with db:
         with app.open_resource('schema.sql') as f:
@@ -210,13 +212,13 @@ def build_redis():
 def tuplize(s):
     return (s,)
 
-def store_posts():
+def store_posts(topic_name, source_name):
     db = connect_db()
     cur = db.cursor()
 
-    cur.execute(queries['add_topic'], (u'총선', ))
+    cur.execute(queries['add_topic'], (topic_name, ))
     topic_id = cur.lastrowid
-    cur.execute(queries['add_source'], ('naver', ))
+    cur.execute(queries['add_source'], (source_name, ))
     source_id = cur.lastrowid
 
     files = crawl()
@@ -225,19 +227,21 @@ def store_posts():
         f = open(fname)
         print 'inserting %s' %fname
 
+        lines = convert_textfile_to_lines(f)
+
+        title = lines[0]
+        url = lines[1]
+        lines = lines[2:]
+        timestamp = fname.split('/')[-1].split('_')[0]
+
         # insert post
-        cur.execute(queries['add_post'], (topic_id, source_id, fname, 'dummy_url'))
+        cur.execute(queries['add_post'], (topic_id, source_id, title, url, timestamp))
         post_id = cur.lastrowid
 
-        lines = convert_textfile_to_lines(f)
         sentences = do_sentencing_without_threading(lines)
         for i in range (len(sentences)):
             # insert sentence
             sentence = sentences[i]
-            # sentence_with_br = sentence.strip() 
-            # if len(sentence) != len(sentence_with_br):
-                # sentence_with_br += '<br>'
-            # cur.execute(queries['add_sentence'], (post_id, i, sentence_with_br))
             cur.execute(queries['add_sentence'], (post_id, i, sentence))
 
             # insert newly appeared words. 
@@ -280,7 +284,7 @@ def posts():
         cur = db.cursor()
 
         cur.execute(queries['get_posts'] %('%s', format_string), [topic] + sources_ids) 
-        posts = [dict(id=int(row[0]), title=row[1], url=row[2]) for row in cur.fetchall()]
+        posts = [dict(id=int(row[0]), title=row[1], url=row[2], timestamp=row[3]) for row in cur.fetchall()]
 
         cur.execute(queries['get_rulesets'], (topic, ))
         rulesets = [dict(category_seq=int(row[0]), name=row[1]) for row in cur.fetchall()]

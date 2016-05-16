@@ -44,6 +44,7 @@ def do_sentencing_without_threading(lines):
     ret = []
     for line in lines:
         striped_line = line.strip()
+        remainder = ''
         if len(line) != len(striped_line):
             remainder = line[len(striped_line):]
         sentences = kkma.sentences(line)
