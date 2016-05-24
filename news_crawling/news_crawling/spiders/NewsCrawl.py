@@ -19,7 +19,7 @@ class NewsCrawl(scrapy.Spider):
     name = "news"
     allowed_domains = ["chosun.com"]
     start_urls = [
-        "http://search.chosun.com/search/news.search?query=%EC%9E%90%EC%82%B4&pageno="+str(x)+"&orderby=&naviarraystr=&kind=&cont1=&cont2=&cont5=&categoryname=&categoryd2=&c_scope=news&sdate=&edate=&premium=" for x in range(1, 31)
+        "http://search.chosun.com/search/news.search?query=%EC%9E%90%EC%82%B4&pageno="+str(x)+"&orderby=&naviarraystr=&kind=&cont1=&cont2=&cont5=&categoryname=&categoryd2=&c_scope=news&sdate=&edate=&premium=" for x in range(1, 51)
     ]
 
     def parse(self, response):

@@ -162,11 +162,11 @@ queries = {
 
 # Should be modified when it be deployed.
 def connect_db():
-    conn = mdb.connect(host='localhost', user='root', passwd='', db='morpheme')
+    conn = mdb.connect(host='localhost', user='root', passwd='', db='morpheme', charset='utf8')
     return conn
 
 def connect_redis():
-    rd = redis.StrictRedis(host='localhost', port=6379, db=0)
+    rd = redis.StrictRedis(host='localhost', port=6310, db=0)
     return rd
 
 # Only execute at the first time.
@@ -311,26 +311,29 @@ def posts():
         rule_count_dic = {key: rd.bitcount(key) for key in rd.keys()}
         post_ruleset_count_dic = {}
 
-        for rule_id in rd.keys():
-            rule_id = int(rule_id)
-            category_seq = rule_ruleset_dic[rule_id]
-            sentence_ids = retrieve_sentence_ids(rd, rule_id)
-            if not sentence_ids: continue
-            format_string_sentence_ids = ', '.join(['%s']*len(sentence_ids))
-            cur.execute(queries['get_post_sentences_rel']%(queries['get_sentences_rnum'], '%s')
-                                                         %('%s', format_string, format_string_sentence_ids),
-                        [topic] + sources_ids + sentence_ids)
-            for row in cur.fetchall():
-                post_id = int(row[0])
-                sentence_seq = int(row[1])
-                if post_id in post_ruleset_count_dic:
-                    category_count_dic = post_ruleset_count_dic[post_id]
-                    if category_seq in category_count_dic:
-                        category_count_dic[category_seq] += 1
+        try:
+            for rule_id in rd.keys():
+                rule_id = int(rule_id)
+                category_seq = rule_ruleset_dic[rule_id]
+                sentence_ids = retrieve_sentence_ids(rd, rule_id)
+                if not sentence_ids: continue
+                format_string_sentence_ids = ', '.join(['%s']*len(sentence_ids))
+                cur.execute(queries['get_post_sentences_rel']%(queries['get_sentences_rnum'], '%s')
+                                                             %('%s', format_string, format_string_sentence_ids),
+                            [topic] + sources_ids + sentence_ids)
+                for row in cur.fetchall():
+                    post_id = int(row[0])
+                    sentence_seq = int(row[1])
+                    if post_id in post_ruleset_count_dic:
+                        category_count_dic = post_ruleset_count_dic[post_id]
+                        if category_seq in category_count_dic:
+                            category_count_dic[category_seq] += 1
+                        else:
+                            category_count_dic[category_seq] = 1
                     else:
-                        category_count_dic[category_seq] = 1
-                else:
-                    post_ruleset_count_dic[post_id] = {category_seq: 1}
+                        post_ruleset_count_dic[post_id] = {category_seq: 1}
+        except:
+            pass
 
         return jsonify(posts                    = posts, \
                        rulesets                 = rulesets, \
@@ -501,10 +504,10 @@ def run():
                 sentence_id = int(row_sentence[1])
                 word_seqs = map(int, row_sentence[2].split(','))
                 sentence_word_ids = map(int, row_sentence[3].split(','))
-                if rule_id == 72:
-                    print "post_id: %s \nsenence_id: %s\nword_seqs: %s\nsentence_word_ids: %s\ngap: %s\nrule_word_ids: %s" %(post_id, sentence_id, word_seqs, sentence_word_ids, gap, rule_word_ids)
+                # if rule_id == 72:
+                    # print "post_id: %s \nsenence_id: %s\nword_seqs: %s\nsentence_word_ids: %s\ngap: %s\nrule_word_ids: %s" %(post_id, sentence_id, word_seqs, sentence_word_ids, gap, rule_word_ids)
                 if is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
-                    if rule_id == 72: print "valid"
+                    # if rule_id == 72: print "valid"
                     valid_sentences.append(sentence_id)
                     if post_id in post_ruleset_count_dic:
                         category_count_dic = post_ruleset_count_dic[post_id]
@@ -523,8 +526,8 @@ def run():
 
 if __name__ == '__main__':
     # init_db()
-    # store_posts()
+    # store_posts('자살', '조선일보')
     # build_redis()
-    app.run(debug=True)
+    app.run()
     # pass
 
