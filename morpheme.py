@@ -6,6 +6,8 @@ import redis
 import _mysql_exceptions
 import ast
 from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash, jsonify
+import logging
+from logging.handlers import RotatingFileHandler
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -166,7 +168,7 @@ def connect_db():
     return conn
 
 def connect_redis():
-    rd = redis.StrictRedis(host='localhost', port=6310, db=0)
+    rd = redis.StrictRedis(host='localhost', port=6379, db=0)
     return rd
 
 # Only execute at the first time.
@@ -211,6 +213,12 @@ def build_redis():
 
 def tuplize(s):
     return (s,)
+
+def formatstring(arr):
+    if type(arr) == list:
+        return ', '.join(['%s']*len(arr))
+    else:
+        return '%s'
 
 def store_posts(topic_name, source_name):
     db = connect_db()
@@ -267,6 +275,8 @@ def teardown_request(exception):
 
 @app.route('/')
 def initialize_page():
+    app.logger.info('Initial Page')
+
     cur = g.db.cursor()
     cur.execute(queries['get_topics'])
     topics = [dict(id=int(row[0]), name=row[1]) for row in cur.fetchall()]
@@ -279,7 +289,10 @@ def posts():
     if request.method == 'GET':
         topic = ast.literal_eval(request.args.get('topic'))
         sources_ids = ast.literal_eval(request.args.get('sources'))
-        format_string = ', '.join(['%s']*len(sources_ids))
+        format_string = formatstring(sources_ids)
+        
+        app.logger.info('GET posts: topic(%s), sources_ids(%s)'%('%s', format_string)%tuple([topic]+[sources_ids]))
+
         db = g.db
         cur = db.cursor()
 
@@ -311,13 +324,13 @@ def posts():
         rule_count_dic = {key: rd.bitcount(key) for key in rd.keys()}
         post_ruleset_count_dic = {}
 
-        try:
-            for rule_id in rd.keys():
+        for rule_id in rd.keys():
+            try:
                 rule_id = int(rule_id)
                 category_seq = rule_ruleset_dic[rule_id]
                 sentence_ids = retrieve_sentence_ids(rd, rule_id)
                 if not sentence_ids: continue
-                format_string_sentence_ids = ', '.join(['%s']*len(sentence_ids))
+                format_string_sentence_ids = formatstring(sentence_ids)
                 cur.execute(queries['get_post_sentences_rel']%(queries['get_sentences_rnum'], '%s')
                                                              %('%s', format_string, format_string_sentence_ids),
                             [topic] + sources_ids + sentence_ids)
@@ -332,8 +345,9 @@ def posts():
                             category_count_dic[category_seq] = 1
                     else:
                         post_ruleset_count_dic[post_id] = {category_seq: 1}
-        except:
-            pass
+            except:
+                app.logger.error('GET post: redis read previous result error with key(%s)'%(ruld_id))
+                rd.flushall()
 
         return jsonify(posts                    = posts, \
                        rulesets                 = rulesets, \
@@ -345,11 +359,14 @@ def posts():
 @app.route('/_sentences', methods=['GET'])
 def sentences():
     if request.method == 'GET':
-        cur = g.db.cursor()
         topic = ast.literal_eval(request.args.get('topic'))
         sources_ids = ast.literal_eval(request.args.get('sources'))
-        format_string = ', '.join(['%s']*len(sources_ids))
+        format_string = formatstring(sources_ids)
         post_id = ast.literal_eval(request.args.get('post_id'))
+
+        app.logger.info('GET sentneces: topic(%s), sources_ids(%s), post_id(%s)'%('%s',format_string, '%s')%tuple([topic]+sources_ids+[post_id]))
+
+        cur = g.db.cursor()
         cur.execute(queries['get_sentences']%(queries['get_sentences_rnum'], '%s')%('%s', format_string, '%s'), \
                     [topic] + sources_ids + [post_id])
         rd = g.rd
@@ -363,7 +380,7 @@ def sentences():
                     if rd.getbit(key, sentence_id) == 1:
                         rules.append(int(key))
                 except:
-                    pass
+                    app.logger.error('GET sentences: redis getbit error with key(%s)'%(key))
             sentences.append(dict(sentence_id=sentence_id, full_text=full_text, rules=rules))
         # sentences = [dict(sentence_id=row[0], full_text=row[1]) for row in cur.fetchall()]
         return jsonify(sentences=sentences)
@@ -373,16 +390,23 @@ def rulesets():
     if request.method == 'POST':
         topic = ast.literal_eval(request.form['topic'])
         name = request.form['name']
+
+        app.logger.info('POST rulesets: topic(%s), name(%s)'%(topic, name))
+
         db = g.db
-        cur = db.cursor()
+        # cur = db.cursor()
         cur.execute(queries['add_ruleset'], (topic, name, topic))
         db.commit()
         cur.execute(queries['get_ruleset'], (topic, ))
         rulesets = [dict(category_seq=int(row[0]), name=row[1]) for row in cur.fetchall()]
         return jsonify(rulesets=rulesets)
+
     if request.method == 'DELETE':
         topic = ast.literal_eval(request.form['topic'])
         category_seq = ast.literal_eval(request.form['category_seq'])
+
+        app.logger.info('DELETE rulesets: topic(%s), category_seq(%s)'%(topic, category_seq))
+
         db = g.db
         cur = db.cursor()
         cur.execute(queries['get_rules'], (topic, category_seq))
@@ -398,20 +422,25 @@ def rulesets():
 
 @app.route('/_parsing', methods=['GET'])
 def parsing():
-    jpype.attachThreadToJVM()
     text = request.args.get('text')
+    
+    app.logger.info('GET parsing: text(%s)'%(text))
+
+    jpype.attachThreadToJVM()
     return jsonify(morphs=do_parsing_without_threading(text))
 
 @app.route('/_rules', methods=['POST', 'DELETE'])
 def rules():
-    db = g.db
-    cur = db.cursor()
-
     if request.method == 'POST':
         topic = ast.literal_eval(request.form['topic'])
         category_seq = ast.literal_eval(request.form['category_seq'])
         ruleText = request.form['ruleText']
         checked = ast.literal_eval(request.form['checked'])
+        
+        app.logger.info('POST rules: text(%s), words(%s)'%('%s', formatstring(checked))%tuple([ruleText]+checked))
+
+        db = g.db
+        cur = db.cursor()
         cur.executemany(queries['add_word'], map(tuplize, [x['word'] for x in checked]))
         cur.execute(queries['add_rule'], (topic, category_seq, ruleText))
         rule_id = cur.lastrowid
@@ -427,8 +456,13 @@ def rules():
         return jsonify(rules=rules)
     elif request.method == 'DELETE':
         rule_id = ast.literal_eval(request.form['rule_id'])
+
+        app.logger.info('DELETE rules: rule_id(%s)'%(rule_id))
+
         rd = g.rd
         rd.delete(rule_id)
+        db = g.db
+        cur = db.cursor()
         cur.execute(queries['del_rule_word_relations'], (rule_id, ))
         cur.execute(queries['del_rule'], (rule_id, ))
         db.commit()
@@ -470,12 +504,18 @@ def is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
     else:
         return False
 
+@app.errorhandler(Exception)
+def internal_error(exception):
+    app.logger.error(exception)
+
 @app.route('/_analysis', methods=['POST'])
-def run():
+def analysis():
     if request.method == 'POST':
         topic = ast.literal_eval(request.form['topic'])
         sources_ids = ast.literal_eval(request.form['sources'])
-        source_format_string = ', '.join(['%s']*len(sources_ids))
+        source_format_string = formatstring(sources_ids)
+
+        app.logger.info('POST anaysis: topic(%s), sources_ids(%s)'%('%s', sources_ids)%tuple([topic]+sources_ids))
 
         rd = g.rd
         rd.flushall()
@@ -493,7 +533,7 @@ def run():
             pipe.setbit(rule_id, 0, 0)
             gap = int(row_rule[2])
             rule_word_ids = map(int, row_rule[3].split(','))
-            rule_word_id_format_string = ', '.join(['%s']*len(rule_word_ids))
+            rule_word_id_format_string = formatstring(rule_word_ids)
             cur.execute(queries['get_sentence_words_rnum']%(queries['get_sentence_words'], queries['get_sentences_rnum'])
                                                            %('%s', source_format_string, rule_word_id_format_string, rule_word_id_format_string, '%s', \
                                                              '%s', source_format_string),
@@ -504,10 +544,7 @@ def run():
                 sentence_id = int(row_sentence[1])
                 word_seqs = map(int, row_sentence[2].split(','))
                 sentence_word_ids = map(int, row_sentence[3].split(','))
-                # if rule_id == 72:
-                    # print "post_id: %s \nsenence_id: %s\nword_seqs: %s\nsentence_word_ids: %s\ngap: %s\nrule_word_ids: %s" %(post_id, sentence_id, word_seqs, sentence_word_ids, gap, rule_word_ids)
                 if is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
-                    # if rule_id == 72: print "valid"
                     valid_sentences.append(sentence_id)
                     if post_id in post_ruleset_count_dic:
                         category_count_dic = post_ruleset_count_dic[post_id]
@@ -528,6 +565,10 @@ if __name__ == '__main__':
     # init_db()
     # store_posts('자살', '조선일보')
     # build_redis()
-    app.run()
-    # pass
+    formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
+    handler = RotatingFileHandler('usage.log', maxBytes=10000, backupCount=1)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(formatter)
+    app.logger.addHandler(handler)
+    app.run(debug=True)
 
