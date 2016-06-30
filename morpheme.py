@@ -47,16 +47,23 @@ queries = {
     'get_posts_'                :   'SELECT B._id, A.full_text FROM sentences AS A INNER JOIN posts AS B ON A.post_id = B._id \
                                      WHERE B.topic_id = %s and B.source_id IN (%s)', # not used
     # param: topic_id, source_ids_string
-    'get_posts'                 :   'SELECT _id, title, url, timestamp FROM posts WHERE topic_id = %s and source_id IN (%s)',
+    # 'get_posts'                 :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = %s and source_id IN (%s)',
+    'get_posts'                 :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} and source_id IN ({})',
 
     # param: post_id, sentence_seq, full_text
     'add_sentence'              :   'INSERT INTO sentences (post_id, sentence_seq, full_text) VALUES (%s, %s, %s)',
     # param: post_id
-    'get_sentences_'             :   'SELECT sentence_seq, full_text FROM sentences WHERE post_id = %s',
-    'get_sentences'            :   'SELECT r.rnum, s.full_text \
+    'get_sentences_'            :   'SELECT sentence_seq, full_text FROM sentences WHERE post_id = %s',
+    'get_sentences'             :   'SELECT r.rnum, s.full_text \
                                      FROM sentences AS s \
                                      JOIN (%s) AS r ON s.post_id = r.post_id AND s.sentence_seq = r.sentence_seq \
                                      WHERE r.post_id = %s \
+                                     ORDER BY rnum ASC',
+    # param: sentence_ids
+    'get_sentences_by_rule'     :   'SELECT r.rnum AS sentence_id, s.full_text \
+                                     FROM sentences AS s \
+                                     JOIN (%s) AS r ON s.post_id = r.post_id AND s.sentence_seq = r.sentence_seq \
+                                     WHERE r.rnum IN (%s) \
                                      ORDER BY rnum ASC',
     # param: topic, sentence_seqs
     'get_post_sentences_rel'    :   'select post_id, sentence_seq from (%s) as t WHERE rnum in (%s)',
@@ -219,6 +226,12 @@ def formatstring(arr):
         return ', '.join(['%s']*len(arr))
     else:
         return '%s'
+def formatstringBracket(arr):
+    if type(arr) == list:
+        return ', '.join(['{}']*len(arr))
+    else:
+        return '{}'
+
 
 def store_posts(topic_name, source_name):
     db = connect_db()
@@ -290,13 +303,15 @@ def posts():
         topic = ast.literal_eval(request.args.get('topic'))
         sources_ids = ast.literal_eval(request.args.get('sources'))
         format_string = formatstring(sources_ids)
+        format_string_bracket = formatstringBracket(sources_ids)
         
         app.logger.info('GET posts: topic(%s), sources_ids(%s)'%('%s', format_string)%tuple([topic]+[sources_ids]))
 
         db = g.db
         cur = db.cursor()
 
-        cur.execute(queries['get_posts'] %('%s', format_string), [topic] + sources_ids) 
+        print queries['get_posts'].format('{}', format_string_bracket).format(topic, *sources_ids)
+        cur.execute(queries['get_posts'].format('{}', format_string_bracket).format(topic, *sources_ids))
         posts = [dict(id=int(row[0]), title=row[1], url=row[2], timestamp=row[3]) for row in cur.fetchall()]
 
         cur.execute(queries['get_rulesets'], (topic, ))
@@ -328,7 +343,7 @@ def posts():
             try:
                 rule_id = int(rule_id)
                 category_seq = rule_ruleset_dic[rule_id]
-                sentence_ids = retrieve_sentence_ids(rd, rule_id)
+                sentence_ids = retrieve_sentence_ids(rd, [rule_id])
                 if not sentence_ids: continue
                 format_string_sentence_ids = formatstring(sentence_ids)
                 cur.execute(queries['get_post_sentences_rel']%(queries['get_sentences_rnum'], '%s')
@@ -385,6 +400,51 @@ def sentences():
         # sentences = [dict(sentence_id=row[0], full_text=row[1]) for row in cur.fetchall()]
         return jsonify(sentences=sentences)
 
+@app.route('/_sentences_by_rule', methods=['GET'])
+def sentences_by_rule():
+    if request.method == 'GET':
+        rd = g.rd
+        db = g.db
+        cur = db.cursor()
+
+        topic = ast.literal_eval(request.args.get('topic'))
+        sources_ids = ast.literal_eval(request.args.get('sources'))
+        format_string = formatstring(sources_ids)
+        isRuleset = True if request.args.get('isRuleset') == 'true' else False
+        rule_id = ast.literal_eval(request.args.get('rule_id'))
+
+        app.logger.info('GET sentences_by_rule: topic(%s), sources_ids(%s), isRuleset(%s), ruleset_or_rule_id(%s)'\
+                %('%s',format_string, '%s', '%s')%tuple([topic]+sources_ids+[isRuleset, rule_id]))
+
+
+        rule_ids = []
+        if isRuleset:
+            cur.execute(queries['get_rules'], (topic, rule_id))
+            for row in cur.fetchall():
+                rule_ids.append(row[0])
+        else:
+            rule_ids.append(rule_id)
+
+        sentence_ids = retrieve_sentence_ids(rd, rule_ids)
+        format_string_sentence_ids = formatstring(sentence_ids)
+
+        cur.execute(queries['get_sentences_by_rule']%(queries['get_sentences_rnum'], '%s')%('%s', format_string, format_string_sentence_ids), \
+                    [topic] + sources_ids + sentence_ids)
+        sentences = []
+        for row in cur.fetchall():
+            sentence_id = int(row[0])
+            full_text = row[1]
+            rules = []
+            for key in rd.keys():
+                try:
+                    if rd.getbit(key, sentence_id) == 1:
+                        rules.append(int(key))
+                except:
+                    app.logger.error('GET sentences: redis getbit error with key(%s)'%(key))
+            sentences.append(dict(sentence_id=sentence_id, full_text=full_text, rules=rules))
+        # sentences = [dict(sentence_id=row[0], full_text=row[1]) for row in cur.fetchall()]
+        return jsonify(sentences=sentences)
+
 @app.route('/_rulesets', methods=['POST', 'DELETE'])
 def rulesets():
     if request.method == 'POST':
@@ -394,7 +454,7 @@ def rulesets():
         app.logger.info('POST rulesets: topic(%s), name(%s)'%(topic, name))
 
         db = g.db
-        # cur = db.cursor()
+        cur = db.cursor()
         cur.execute(queries['add_ruleset'], (topic, name, topic))
         db.commit()
         cur.execute(queries['get_ruleset'], (topic, ))
@@ -468,16 +528,16 @@ def rules():
         db.commit()
         return jsonify(deleted=dict(rule_id=rule_id))
 
-# not used
-def retrieve_sentence_ids(rd, key):
+def retrieve_sentence_ids(rd, keys):
     ret = []
-    rd.set('tmp', rd.get(key))
-    while(True):
-        pos = rd.bitpos('tmp', 1)
-        if pos < 0: break
-        ret.append(int(pos))
-        rd.setbit('tmp', pos, 0)
-    rd.delete('tmp')
+    for key in keys:
+        rd.set('tmp', rd.get(key))
+        while(True):
+            pos = rd.bitpos('tmp', 1)
+            if pos < 0: break
+            ret.append(int(pos))
+            rd.setbit('tmp', pos, 0)
+        rd.delete('tmp')
     return ret
 
 def is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
@@ -515,7 +575,7 @@ def analysis():
         sources_ids = ast.literal_eval(request.form['sources'])
         source_format_string = formatstring(sources_ids)
 
-        app.logger.info('POST anaysis: topic(%s), sources_ids(%s)'%('%s', sources_ids)%tuple([topic]+sources_ids))
+        app.logger.info('POST anaysis: topic(%s), sources_ids(%s)'%('%s', source_format_string)%tuple([topic]+sources_ids))
 
         rd = g.rd
         rd.flushall()
@@ -566,9 +626,10 @@ if __name__ == '__main__':
     # store_posts('자살', '조선일보')
     # build_redis()
     formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
-    handler = RotatingFileHandler('usage.log', maxBytes=10000, backupCount=1)
+    handler = RotatingFileHandler('./logs/usage.log', maxBytes=10000, backupCount=1)
     handler.setLevel(logging.INFO)
     handler.setFormatter(formatter)
     app.logger.addHandler(handler)
-    app.run(debug=True)
+    # app.run(debug=True)
+    app.run()
 

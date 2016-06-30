@@ -81,7 +81,7 @@ var show_sentences = function(post_id, title, sentences){
     $(document).off('mouseleave', 'span[data-toggle="popover"]');
     $('#post-modal-body-p').empty();
     $('#post-modal-chart').empty();
-    $('#post-modal-header-h4').text(title);
+    if(title) $('#post-modal-header-h4').text(title);
     $.each(sentences, function(){
         var sentence_id = this.sentence_id;
         var full_text = this.full_text;
@@ -92,13 +92,22 @@ var show_sentences = function(post_id, title, sentences){
                 'name':'sentence-span',
             }).text(full_text)
         );
-        if(full_text.lastIndexOf('\n') > 0){
-            $('#post-modal-body-p').append($('<br>'));
+        if(title){
+            if(full_text.lastIndexOf('\n') > 0){
+                $('#post-modal-body-p').append($('<br>'));
+            }
+        }else{
+            $('#post-modal-body-p').append($('<br><br>'));
         }
         var rules = this.rules;
         if(rules.length != 0){
-            var ruleset_id = get_ruleset_by_rule(rules[0]);
-            var color = get_color_by_ruleset(ruleset_id);
+            var color = null;
+            if (title){
+                var ruleset_id = get_ruleset_by_rule(rules[0]);
+                color = get_color_by_ruleset(ruleset_id);
+            }else{
+                color = get_color_by_ruleset(rules[0]);
+            }
             $('#sentence-span-'+sentence_id).css('background-color', color);
             $('#sentence-span-'+sentence_id).attr({
                 'data-toggle':'popover',
@@ -160,7 +169,8 @@ var show_posts = function(posts){
         var url = this.url;
         var timestamp = this.timestamp;
         $('#posts').append(
-                $('<tr>').prepend(
+            $('<tr>').prepend(
+                $('<td>').text(post_id),
                 $('<td>').append(
                     $('<a>').attr({
                         'name':'post-a',
@@ -225,7 +235,10 @@ var show_rules = function(ruleset_rules_dic, rule_count_dic){
                                 'class':'badge',
                                 'id':'rule-badge-'+rule_id,
                                 'name':'rule-badge-'+category_seq,
-                                'style':'margin-right:5px'
+                                'style':'margin-right:5px',
+                                'data-toggle':'modal',
+                                'data-target':'#post-modal'
+
                             }),
                             $('<button>').attr({
                                 'class':'btn btn-warning btn-xs glyphicon glyphicon-remove ruleset-button',
@@ -249,6 +262,29 @@ var show_rules = function(ruleset_rules_dic, rule_count_dic){
         });
     }
     update_rule_badge(rule_count_dic);
+    $(document).on('click', '.badge', function(){
+        var type = this.id.split('-')[0];
+        var idx = this.id.split('-').pop();
+        var isRuleset = false;
+        if(type == 'ruleset') isRuleset = true;
+        jQuery.ajax({
+            type: 'GET',
+            url: '/_sentences_by_rule',
+            data: {
+                'topic': topic,
+                'sources': JSON.stringify(sources),
+                'isRuleset': isRuleset,
+                'rule_id' : idx
+            },
+            dataType: 'JSON',
+            success: function(data){
+                show_sentences(null, null, data.sentences);
+            },
+            error: function(xhr, status, error){
+                console.log('get sentences failed');
+            }
+        });
+    });
     $(document).on('click', 'button[name=delete-rule-btn]', function(){
         var rule_id = this.value
         jQuery.ajax({
@@ -278,9 +314,6 @@ var show_rules = function(ruleset_rules_dic, rule_count_dic){
                 console.log('get rules failed');
             }
         });
-    });
-    $(function(){
-        $('[data-toggle="tooltip"]').tooltip();
     });
 }
 
@@ -362,7 +395,10 @@ var show_rulesets = function(rulesets){
                             'class':'badge',
                             'id':'ruleset-badge-'+category_seq,
                             'name':'ruleset-badge',
-                            'style':'margin-right:5px'
+                            'style':'margin-right:5px',
+                            'data-toggle':'modal',
+                            'data-target':'#post-modal'
+
                         }),
                         $('<button>').attr({
                             'class':'btn btn-info btn-xs glyphicon glyphicon-file ruleset-button',
@@ -383,12 +419,25 @@ var show_rulesets = function(rulesets){
                     'class':'dropdown-menu navmenu-nav',
                     'name':'ruleset-menu',
                     'id':'ruleset-menu-'+category_seq,
-                    'role':'menu'
+                    'role':'menu',
+                    'style':'display:none' // add
                 })
             )
         );
     });
+    $('#rulesets').on('click', 'li', function(){
+        var id = this.id.split('-').pop();
+        var ruleset = $('#ruleset-menu-'+id);
+        if (ishover) return
+        if (ruleset.css('display') == 'block'){
+            ruleset.css('display', 'none');
+        }
+        else{
+            ruleset.css('display', 'block');
+        }
+    });
     $(document).on('click', 'button[name=create-rule-modal-btn]', function(){
+        $('#create-rule-reset-btn').click();
         $('#parse').attr({'value': this.value});
     });
     $(document).on('click', 'button[name=delete-ruleset-btn]', function(){
@@ -417,7 +466,7 @@ var show_rulesets = function(rulesets){
     $(document).on({
             'mouseenter': function(){ ishover = true; },
             'mouseleave': function(){ ishover = false; }
-        }, '.ruleset-button'
+        }, '.ruleset-button, .badge'
     );
 };
 
@@ -530,6 +579,11 @@ var main = function(){
             }
         });
     });
+    $('#ruleset-creator-txt').keypress(function(event){
+        if(event.keyCode == 13){
+            $('#ruleset-creator-btn').click();
+        }
+    });
     $('#parse').click(function(){
         ruleText = $('#rule-text').val();
         jQuery.ajax({
@@ -542,16 +596,21 @@ var main = function(){
                 create_rule_checkbox(data.morphs);
             },
             error: function(xhr, status, error){
-                console.log('parse ajax errrrrrrr');
+                alert('parse error');
             }
         });
+    });
+    $('#rule-text').keypress(function(event){
+        if(event.keyCode == 13){
+            event.preventDefault();
+            $('#parse').click();
+        }
     });
     $('#create-rule-reset-btn').click(function(){
         ruleText = '';
         $('#rule-text').val('');
         empty_checkboxes()
     });
-
     $('#create-rule-btn').click(function(){
         var checked = get_checked_rules();
         var category_seq = $('#parse').val();
@@ -576,7 +635,12 @@ var main = function(){
         });
         uncheck_checkboxes();
     });
-
+    $('#rule-checkboxes').keypress(function(event){
+        if(event.keyCode == 13){
+            event.preventDefault();
+            $('#create-rule-btn').click();
+        }
+    });
     $('#run').click(function(){
         jQuery.ajax({
             type: 'POST',
