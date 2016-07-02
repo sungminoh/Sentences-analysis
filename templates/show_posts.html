@@ -23,7 +23,7 @@
 
 
         <!-- Custom styles for this template -->
-        <!--<link href="../static/show_posts.css" rel="stylesheet">-->
+        <link href="../static/show_posts.css" rel="stylesheet">
 
         <script src="../static/bootstrap/ie-emulation-modes-warning.js"></script>
         <!--<script src="{{ url_for('static', filename='ie-emulation-modes-warning.js') }}"></script>-->
@@ -148,6 +148,14 @@
                         </tbody>
                     </table>
                 </div>
+                <!-- pagination -->
+                <div id="pagination-div">
+                    <nav id="pagination-nav">
+                        <ul class="pagination" id="pagination-ul">
+                        </ul>
+                    </nav>
+                </div>
+
                 <!-- post detail modal -->
                 <div class="modal fade" id="post-modal" tabindex="-1" role="dialog" aria-labelledby="post-modal-label" aria-hidden="true">
                     <div class="modal-dialog" role="document">

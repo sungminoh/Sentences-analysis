@@ -2,6 +2,11 @@ var topic;
 var sources;
 var ruleText;
 var ishover;
+var posts_count;
+var perpage;
+var lastpage;
+var post_ruleset_count_dic;
+var cur_page;
 var chart;
 //var colors = "#e53939,#b2ff80,#3333cc,#661a1a,#073300,#7979f2,#cca099,#00ff00,#1d1a33,#330e00,#00ffaa,#a099cc,#f26100,#00997a,#583973,#732e00,#004033,#9b00a6,#e5a173,#ace6da,#ff00ee,#b39e86,#00e2f2,#40103d,#73561d,#4d8a99,#ff80d5,#e5b800,#00aaff,#ffbfea,#333000,#004b8c,#804059,#f2ff40,#b6d6f2,#cc335c,#a4b386,#434f59,#332628,#448000,#000f73".split(',')
 var colors = "#dbbbaf, #bfd9ad, #bae8e5, #a5abcf, #dfbae8, #deb1bd".split(', ')
@@ -210,6 +215,103 @@ var show_posts = function(posts){
     });
 };
 
+var update_pagination = function(start, init=false){
+    var ul = $('#pagination-ul');
+    lastpage = Math.floor(posts_count/perpage) + 1;
+    curpage = start;
+
+    ul.empty();
+    ul.prepend(
+        '<li id="pagination-prev-li"><a id="pagination-prev-a" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>'
+    );
+    if(start != 1){
+        ul.append(
+            $('<li>').append('<a name="pagination-a" id="pagination-a-1" value="1">1</a>'),
+            $('<li>').append($('<a>').text('...'))
+        )
+    }
+    for(var i=start; i<Math.min(start+10, lastpage); i++){
+        ul.append(
+            $('<li>').append(
+                $('<a>').text(i).attr({
+                    'name': 'pagination-a',
+                    'id': 'pagination-a-'+i,
+                    'value': i
+                })
+            )
+        )
+    }
+    if(start+10 < lastpage){
+        ul.append($('<li>').append($('<a>').text('...')))
+    }
+    ul.append(
+        $('<li>').append(
+            $('<a>').text(lastpage).attr({
+                'name': 'pagination-a',
+                'id': 'pagination-a-'+lastpage,
+                'value': lastpage
+            })
+        ),
+        '<li id="pagination-next-li"><a id="pagination-next-a" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>'
+    );
+
+    if(init){
+        event_bind_pagination();
+        $('#pagination-a-1').parent().addClass('active');
+    }
+    
+}
+var event_bind_pagination = function(){
+    var ul = $('#pagination-ul');
+    $(document).on('click', '#pagination-next-a', function(){
+        var start = Math.floor((curpage-1)/perpage)*perpage+1 + perpage;
+        if(start < Math.floor(posts_count/perpage) + 1){
+            update_pagination(start, false);
+            $('#pagination-a-'+start).click();
+        }
+    })
+    $(document).on('click', '#pagination-prev-a', function(){
+        var start = Math.floor((curpage-1)/perpage)*perpage+1 - perpage;
+        if(start > 0){
+            update_pagination(start, false);
+            $('#pagination-a-'+start).click();
+        }
+    })
+    $(document).on('click', '#pagination-a-'+lastpage, function(){
+        var start = Math.floor(lastpage/10)*10+1;
+        update_pagination(start, false);
+        $('#pagination-a-'+lastpage).parent().addClass('active');
+    })
+    $(document).on('click', '#pagination-a-1', function(){
+        update_pagination(1, false);
+        $('#pagination-a-1').parent().addClass('active');
+    })
+
+    $(document).on('click', 'a[name=pagination-a]', function(){
+        $(this).parent().siblings('li').removeClass('active');
+        $(this).parent().addClass('active');
+        jQuery.ajax({
+            type: 'GET',
+            url: '/_posts_by_page',
+            data: {
+                'topic': topic,
+                'sources':JSON.stringify(sources),
+                'page': this.getAttribute('value')
+            },
+            dataType: 'JSON',
+            success: function(data){
+                clear_posts();
+                show_posts(data.posts);
+                update_post_badge();
+            },
+            error: function(xhr, status, error){
+                console.log('get posts failed');
+            }
+        });
+    })
+}
+
+
 var show_rules = function(ruleset_rules_dic, rule_count_dic){
     $(document).off('click', 'button[name=delete-rule-btn]');
     for(var category_seq in ruleset_rules_dic){
@@ -338,7 +440,7 @@ var update_rule_badge = function(rule_count_dic){
         }
     }
 }
-var update_post_badge = function(post_ruleset_count_dic){
+var update_post_badge = function(){
     $('td[name=post-td]').empty();
     $.each(post_ruleset_count_dic, function(post_id, ruleset_count_dic){
         $('#post-td-'+post_id).append(
@@ -550,9 +652,18 @@ var main = function(){
                 clear_posts();
                 clear_rulesets();
                 show_posts(data.posts);
+
+                posts_count = data.posts_count;
+                perpage = data.posts.length;
+                update_pagination(1, true);
+                curpage = 1;
+
                 show_rulesets(data.rulesets);
                 show_rules(data.ruleset_rules_dic, data.rule_count_dic);
-                update_post_badge(data.post_ruleset_count_dic);
+
+                post_ruleset_count_dic = data.post_ruleset_count_dic;
+                update_post_badge();
+
                 var chart_data = get_chart_data(data.rulesets, data.ruleset_rules_dic, data.rule_count_dic);
                 chart.draw(chart_data.data, chart_data.option);
             },
