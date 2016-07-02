@@ -30,6 +30,10 @@ app.config.update(dict(
     ))
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
+config = dict(
+    perpage   =   10
+)
+
 queries = {
     # param: topic_name
     'add_topic'                 :   'INSERT INTO topics (name) VALUES (%s)',
@@ -43,12 +47,11 @@ queries = {
 
     # param: topic_id, source_id, title, url
     'add_post'                  :   'INSERT INTO posts (topic_id, source_id, title, url, timestamp) VALUES (%s, %s, %s, %s, %s)',
+
+    'get_posts_count'           :   'SELECT COUNT(*) FROM posts WHERE topic_id = {} AND source_id in ({})',
+
     # param: topic_id, source_ids_string
-    'get_posts_'                :   'SELECT B._id, A.full_text FROM sentences AS A INNER JOIN posts AS B ON A.post_id = B._id \
-                                     WHERE B.topic_id = %s and B.source_id IN (%s)', # not used
-    # param: topic_id, source_ids_string
-    # 'get_posts'                 :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = %s and source_id IN (%s)',
-    'get_posts'                 :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} and source_id IN ({})',
+    'get_posts'                 :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({})',
 
     # param: post_id, sentence_seq, full_text
     'add_sentence'              :   'INSERT INTO sentences (post_id, sentence_seq, full_text) VALUES (%s, %s, %s)',
@@ -297,6 +300,11 @@ def initialize_page():
     sources = [dict(id=int(row[0]), name=row[1]) for row in cur.fetchall()]
     return render_template('show_posts.html', topics=topics, sources=sources)
 
+
+def get_post_between(cur, topic, sources_ids, start, number):
+    cur.execute(queries['get_posts'].format('{}', formatstringBracket(sources_ids)).format(topic, *sources_ids) + 'LIMIT %s, %s'%(start, number))
+    return cur
+
 @app.route('/_posts', methods=['GET'])
 def posts():
     if request.method == 'GET':
@@ -310,8 +318,10 @@ def posts():
         db = g.db
         cur = db.cursor()
 
-        print queries['get_posts'].format('{}', format_string_bracket).format(topic, *sources_ids)
-        cur.execute(queries['get_posts'].format('{}', format_string_bracket).format(topic, *sources_ids))
+        cur.execute(queries['get_posts_count'].format('{}', format_string_bracket).format(topic, *sources_ids))
+        posts_count = cur.fetchall()[0][0]
+
+        get_post_between(cur, topic, sources_ids, 0, config['perpage'])
         posts = [dict(id=int(row[0]), title=row[1], url=row[2], timestamp=row[3]) for row in cur.fetchall()]
 
         cur.execute(queries['get_rulesets'], (topic, ))
@@ -364,12 +374,31 @@ def posts():
                 app.logger.error('GET post: redis read previous result error with key(%s)'%(ruld_id))
                 rd.flushall()
 
-        return jsonify(posts                    = posts, \
+        return jsonify(posts_count              = posts_count, \
+                       posts                    = posts, \
                        rulesets                 = rulesets, \
                        ruleset_rules_dic        = ruleset_rules_dic, \
                        rule_count_dic           = rule_count_dic, \
                        post_ruleset_count_dic   = post_ruleset_count_dic)
 
+@app.route('/_posts_by_page', methods=['GET'])
+def posts_by_page():
+    if request.method == 'GET':
+        topic = ast.literal_eval(request.args.get('topic'))
+        sources_ids = ast.literal_eval(request.args.get('sources'))
+        format_string = formatstring(sources_ids)
+        format_string_bracket = formatstringBracket(sources_ids)
+        page = ast.literal_eval(request.args.get('page'))
+        
+        app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s)'%('%s', format_string, '%s')%tuple([topic]+[sources_ids]+[page]))
+
+        db = g.db
+        cur = db.cursor()
+
+        from_post_rnum = (page-1)*config['perpage']
+        get_post_between(cur, topic, sources_ids, from_post_rnum, config['perpage'])
+        posts = [dict(id=int(row[0]), title=row[1], url=row[2], timestamp=row[3]) for row in cur.fetchall()]
+        return jsonify(posts = posts)
 
 @app.route('/_sentences', methods=['GET'])
 def sentences():

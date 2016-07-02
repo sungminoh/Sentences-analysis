@@ -1,4 +1,4 @@
-# -*- coding: utf-8- -*-
+# -*- coding: utf-8 -*-
 import MySQLdb as mdb
 import scrapy
 import xml.etree.ElementTree
