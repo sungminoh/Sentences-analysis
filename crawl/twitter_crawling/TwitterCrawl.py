@@ -2,6 +2,7 @@
 
 import tweepy as tw
 import traceback
+from time import strftime, sleep
 
 access_token = '1507884330-zKrVVS279t8dolO9y2cGw8d0HCVHDyGz03kSom7'
 access_token_secret = 'AZSbHnLftFQ7ks0CkJxHQwm0d9o6fEswKpJdHAxxqVDSH'
@@ -17,41 +18,69 @@ if __name__=='__main__':
     
     fname = None
     texts = []
-    
-    i = 0
-    j = 0
-    for tweet in tw.Cursor(api.search, q=u'자살', since='2016-06-01', until='2016-06-30', lang='ko').items():
-        j += 1
+    created_ats = []
 
-        texts.append(tweet.text)
-        
-        if j >= 10:
-            # reset
-            i += 1
-            j = 0
+    flogname = './crawl.log'
+    # daterange = ['2016-06-01', '2016-06-06', '2016-06-11', '2016-06-16', '2016-06-21', '2016-06-26', '2016-07-01']
+    daterange = ['2016-06-01', '2016-06-06', '2016-06-11', '2016-06-16', '2016-06-21', '2016-06-24 16:52:01']
 
-            # get string
-            if not texts: continue
-            fname = './posts/%s_%s.txt' %(str(tweet.created_at), str(i))
-            title = None
-            for t in texts:
-                title = t[0:50]
-                if len(title) > 10: break
-            text = '\n'.join(texts)
-            del texts[:]
-            
-            # write
+    for i in range(len(daterange)-1):
+        j = 0
+        print daterange[i]
+        with open(flogname, 'a') as log:
+            log.write('[%s] crawl started since %s, until %s' %(strftime('%Y-%m-%d %H:%M:%S'), daterange[i], daterange[i+1]))
+        cur = tw.Cursor(api.search, q=u'자살', since=daterange[i], until=daterange[i+1], lang='ko').items()
+        with open(flogname, 'a') as log:
+            log.write(' --- SUCCESS\n')
+        while True:
             try:
-                with open(fname, 'w') as f:
-                    f.write(title.encode('utf-8'))
-                    f.write('\n')
-                    f.write(text.encode('utf-8'))
-            except Exception:
-                print title
-                print
+                tweet  = cur.next()
+            except tw.TweepError:
+                with open(flogname, 'a') as log:
+                    log.write('[%s] Sleep' %(strftime('%Y-%m-%d %H:%M:%S')))
+                sleep(60*15)
+                with open(flogname, 'a') as log:
+                    log.write(' --- SUCCESS\n')
+                continue
+            except StopIteration:
+                with open(flogname, 'a') as log:
+                    log.write('[%s] Stop Iteration\n' %(strftime('%Y-%m-%d %H:%M:%S')))
+                break
+            except:
+                with open(flogname, 'a') as log:
+                    log.write('[%s] Exception\n' %(strftime('%Y-%m-%d %H:%M:%S')))
+                break
 
+            j += 1
 
+            texts.append('[%s] %s' %(tweet.created_at, tweet.text))
+            created_ats.append(tweet.created_at)
+            
+            if j >= 100:
+                # reset
+                j = 0
 
- 
+                # get string
+                if not texts: continue
+                created_range = '%s - %s (%s)' %(created_ats[0], created_ats[-1], len(texts))
+                text = '\n'.join(texts)
+                del texts[:]
+                del created_ats[:]
+                
+                # write
+                fname = './posts/%s.txt' %(created_range)
+                try:
+                    with open(fname, 'a') as f:
+                        f.write(created_range.encode('utf-8'))
+                        f.write('\n\n')
+                        f.write(text.encode('utf-8'))
+                except Exception:
+                    with open(flogname, 'a') as log:
+                        log.write('[%s] %s Write Exception\n' %(strftime('%Y-%m-%d %H:%M:%S'), fname))
+        
+        with open(flogname, 'a') as log:
+            log.write('[%s] %s - %s is done\n' %(strftime('%Y-%m-%d %H:%M:%S'), daterange[i], daterange[i+1]))
 
-
+    with open(flogname, 'a') as log:
+        log.write('[%s] Stop Crawling\n' %(strftime('%Y-%m-%d %H:%M:%S')))
+    log.close()
