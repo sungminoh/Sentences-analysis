@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from konlpy.utils import pprint 
+from konlpy.utils import pprint
 import MySQLdb as mdb
 import redis
 import _mysql_exceptions
@@ -37,7 +37,7 @@ config = dict(
 queries = {
     # param: topic_name
     'add_topic'                 :   'INSERT INTO topics (name) VALUES (%s)',
-    # param: 
+    # param:
     'get_topics'                :   'SELECT _id, name FROM topics',
 
     # param: source_name
@@ -268,7 +268,7 @@ def store_posts(topic_name, source_name):
             sentence = sentences[i]
             cur.execute(queries['add_sentence'], (post_id, i, sentence))
 
-            # insert newly appeared words. 
+            # insert newly appeared words.
             morphs = map(concate_tuple, do_parsing_without_threading(sentence))
             cur.executemany(queries['add_word'], map(tuplize, dedup(morphs)))
 
@@ -276,7 +276,7 @@ def store_posts(topic_name, source_name):
             for j in range(len(morphs)):
                 cur.execute(queries['add_sentence_word_relation'], (post_id, i, j, morphs[j]))
 
-        db.commit()    
+        db.commit()
         print 'Done'
     db.close()
 
@@ -312,8 +312,8 @@ def posts():
         sources_ids = ast.literal_eval(request.args.get('sources'))
         format_string = formatstring(sources_ids)
         format_string_bracket = formatstringBracket(sources_ids)
-        
-        app.logger.info('GET posts: topic(%s), sources_ids(%s)'%('%s', format_string)%tuple([topic]+[sources_ids]))
+
+        app.logger.info('GET posts: topic(%s), sources_ids(%s)'%('%s', format_string)%tuple([topic]+sources_ids))
 
         db = g.db
         cur = db.cursor()
@@ -389,7 +389,7 @@ def posts_by_page():
         format_string = formatstring(sources_ids)
         format_string_bracket = formatstringBracket(sources_ids)
         page = ast.literal_eval(request.args.get('page'))
-        
+
         app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s)'%('%s', format_string, '%s')%tuple([topic]+[sources_ids]+[page]))
 
         db = g.db
@@ -512,7 +512,7 @@ def rulesets():
 @app.route('/_parsing', methods=['GET'])
 def parsing():
     text = request.args.get('text')
-    
+
     app.logger.info('GET parsing: text(%s)'%(text))
 
     jpype.attachThreadToJVM()
@@ -525,7 +525,7 @@ def rules():
         category_seq = ast.literal_eval(request.form['category_seq'])
         ruleText = request.form['ruleText']
         checked = ast.literal_eval(request.form['checked'])
-        
+
         app.logger.info('POST rules: text(%s), words(%s)'%('%s', formatstring(checked))%tuple([ruleText]+checked))
 
         db = g.db
@@ -570,7 +570,7 @@ def retrieve_sentence_ids(rd, keys):
     return ret
 
 def is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
-    previous_word_id = rule_word_ids[0] 
+    previous_word_id = rule_word_ids[0]
     previous_position = -1
     i, j = 0, 0
     while(i < len(rule_word_ids) and j < len(sentence_word_ids)):
