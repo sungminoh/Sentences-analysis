@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from konlpy.tag import Twitter 
+from konlpy.tag import Twitter
 from konlpy.tag import Kkma
-from konlpy.utils import pprint 
+from konlpy.utils import pprint
 from threading import Thread
 from more_itertools import unique_everseen
 import jpype
@@ -47,9 +47,14 @@ def do_sentencing_without_threading(lines):
         remainder = ''
         if len(line) != len(striped_line):
             remainder = line[len(striped_line):]
-        sentences = kkma.sentences(line)
+        try:
+            sentences = kkma.sentences(line)
+        except:
+            sentences = [line]
+            pass
         sentences[-1] += remainder
         ret += sentences
+        del sentences[:]
     return ret
 
 def do_parsing(start, end, sentences, result_parsing_thread):
@@ -80,7 +85,7 @@ def dedup(l):
 def concate_tuple(t):
     return '%s_%s' % t
 
-    
+
 if __name__=='__main__':
 
     f = open('./dummy_article_03.txt')
