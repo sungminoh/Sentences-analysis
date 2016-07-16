@@ -217,7 +217,6 @@ var show_posts = function(posts){
 
 var update_pagination = function(start, init=false){
     var ul = $('#pagination-ul');
-    lastpage = Math.floor(posts_count/perpage) + 1;
     curpage = start;
 
     ul.empty();
@@ -230,7 +229,7 @@ var update_pagination = function(start, init=false){
             $('<li>').append($('<a>').text('...'))
         )
     }
-    for(var i=start; i<Math.min(start+10, lastpage); i++){
+    for(var i=start; i<Math.min(start+perpage, lastpage); i++){
         ul.append(
             $('<li>').append(
                 $('<a>').text(i).attr({
@@ -241,7 +240,7 @@ var update_pagination = function(start, init=false){
             )
         )
     }
-    if(start+10 < lastpage){
+    if(start+perpage < lastpage){
         ul.append($('<li>').append($('<a>').text('...')))
     }
     ul.append(
@@ -259,19 +258,19 @@ var update_pagination = function(start, init=false){
         event_bind_pagination();
         $('#pagination-a-1').parent().addClass('active');
     }
-    
+
 }
 var event_bind_pagination = function(){
     var ul = $('#pagination-ul');
     $(document).on('click', '#pagination-next-a', function(){
-        var start = Math.floor((curpage-1)/perpage)*perpage+1 + perpage;
+        var start = (Math.floor((curpage-1)/perpage)+1) * perpage + 1;
         if(start < Math.floor(posts_count/perpage) + 1){
             update_pagination(start, false);
             $('#pagination-a-'+start).click();
         }
     })
     $(document).on('click', '#pagination-prev-a', function(){
-        var start = Math.floor((curpage-1)/perpage)*perpage+1 - perpage;
+        var start = (Math.floor((curpage-1)/perpage)-1) * perpage + 1;
         if(start > 0){
             update_pagination(start, false);
             $('#pagination-a-'+start).click();
@@ -393,7 +392,7 @@ var show_rules = function(ruleset_rules_dic, rule_count_dic){
             type: 'DELETE',
             url: '/_rules',
             data: {
-                'rule_id':rule_id 
+                'rule_id':rule_id
             },
             dataType: 'JSON',
             success: function(data){
@@ -466,7 +465,7 @@ var update_post_badge = function(){
             );
         });
     });
-    
+
 }
 
 var show_rulesets = function(rulesets){
@@ -655,8 +654,8 @@ var main = function(){
 
                 posts_count = data.posts_count;
                 perpage = data.posts.length;
+                lastpage = Math.floor(posts_count/perpage) + 1;
                 update_pagination(1, true);
-                curpage = 1;
 
                 show_rulesets(data.rulesets);
                 show_rules(data.ruleset_rules_dic, data.rule_count_dic);
