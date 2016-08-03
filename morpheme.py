@@ -14,6 +14,7 @@ sys.setdefaultencoding('utf-8')
 
 from modules.parsing import convert_textfile_to_lines, do_sentencing_without_threading, do_parsing_without_threading, dedup, concate_tuple, do_parsing_by_threading
 from modules.crawling import crawl
+from database_info import mysql_info, redis_info
 
 import jpype
 
@@ -174,11 +175,11 @@ queries = {
 
 # Should be modified when it be deployed.
 def connect_db():
-    conn = mdb.connect(host='localhost', user='root', passwd='', db='morpheme', charset='utf8')
+    conn = mdb.connect(**mysql_info())
     return conn
 
 def connect_redis():
-    rd = redis.StrictRedis(host='localhost', port=6379, db=0)
+    rd = redis.StrictRedis(**redis_info())
     return rd
 
 # Only execute at the first time.
@@ -390,7 +391,7 @@ def posts_by_page():
         format_string_bracket = formatstringBracket(sources_ids)
         page = ast.literal_eval(request.args.get('page'))
 
-        app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s)'%('%s', format_string, '%s')%tuple([topic]+[sources_ids]+[page]))
+        # app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s)'%('%s', format_string, '%s')%tuple([topic]+[sources_ids]+[page]))
 
         db = g.db
         cur = db.cursor()
