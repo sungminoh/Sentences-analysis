@@ -37,8 +37,12 @@
     </head>
 
     <body style data-feedly-mini="yes">
+        <div id="loading-background" class="loading"></div>
+        <div id="loading" class="loading"></div>
+
         <!-- navigation bar -->
-        <!--<nav class="navmenu navmenu-default navmenu-fixed-left offcanvas-sm" role="navigation"> temporary for developing-->
+        <!-- shrink when width is too narrow -->
+        <!--<nav class="navmenu navmenu-default navmenu-fixed-left offcanvas-sm" role="navigation">-->
         <nav class="navmenu navmenu-default navmenu-fixed-left" role="navigation">
             <a class="navmenu-brand" href="/">문장 분석기</a>
             <ul class="nav navmenu-nav">
@@ -67,7 +71,7 @@
                 </div>
             </ul>
             <ul class="nav navmenu-nav" id="rulesets">
-                <!-- here will be rulesets list --> 
+                <!-- here will be rulesets list -->
             </ul>
             <div id="run-btn">
                 <button class="btn btn-info" type="button" id="run">Run</button>
@@ -116,6 +120,7 @@
                 </div>
             </div>
         </div>
+
         <!--
         <div class="container-fluid">
         -->

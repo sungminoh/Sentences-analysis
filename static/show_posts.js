@@ -629,8 +629,23 @@ var draw_chart = function(){
     chart.draw(data, options);
 }
 
+var loading = function(){
+    $('.loading').show();
+    $('.loading').show();
+}
+
+var loaded = function(){
+    $('.loading').hide();
+    $('.loading').hide();
+}
 
 var main = function(){
+    loaded();
+    $(document).ajaxStart(function(){
+        loading();
+    }).ajaxStop(function(){
+        loaded();
+    });
     google.charts.load('current', {'packages':['corechart']});
     google.charts.setOnLoadCallback(draw_chart);
     var httpRequest;
