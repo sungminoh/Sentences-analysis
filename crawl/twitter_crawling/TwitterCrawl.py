@@ -47,15 +47,24 @@ if __name__=='__main__':
     texts = []
     created_ats = []
 
+<<<<<<< HEAD
     dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(27, 32))
     daterange = ['2016-07-%s' % date for date in dates]
     daterange.append('2016-08-01')
+=======
+    dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(16, 23))
+    daterange = ['2016-07-%s' % date for date in dates]
+>>>>>>> f46ce38494ba786827714272df1bde612defa2af
 
     for i in range(len(daterange)-1):
         j = 0
         logging('crawl started since %s, until %s' %(daterange[i], daterange[i+1]))
         cur = tw.Cursor(api.search, q=u'자살', since=daterange[i], until=daterange[i+1], lang='ko').items()
+<<<<<<< HEAD
         logging(' --- SUCCESS')
+=======
+        lgging(' --- SUCCESS')
+>>>>>>> f46ce38494ba786827714272df1bde612defa2af
         while True:
             try:
                 tweet  = cur.next()
