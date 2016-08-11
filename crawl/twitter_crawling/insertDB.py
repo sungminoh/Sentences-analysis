@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import MySQLdb as mdb
+import traceback
 import os
 from time import strftime
 import imp
 parsing = imp.load_source('parsing', '../../modules/parsing.py')
-database_info = imp.load_source('database_info', '../database_info.py')
+database_info = imp.load_source('database_info', '../../database_info.py')
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
-flogname = './insert.log'
+flogname = './log/insert.log'
 
 def get_time():
     return strftime('%Y-%m-%d %H:%M:%S')
@@ -19,7 +20,7 @@ def logging(text):
 
 def reset_db(topic_name, source_name):
     logging('delete start')
-    db = mdb.connect(database_info.mysql_info())
+    db = mdb.connect(**database_info.mysql_info())
     cur = db.cursor()
 
     cur.execute('select _id from topics where name=%s', (topic_name, ))
@@ -57,7 +58,7 @@ def tuplize(s):
 def insert_query(title, timestamp, sentences, morphs_list):
     try:
         ### DB connected ###
-        db = mdb.connect(database_info.mysql_info())
+        db = mdb.connect(**database_info.mysql_info())
         cur = db.cursor()
 
         # insert posts
@@ -94,6 +95,8 @@ def insert_query(title, timestamp, sentences, morphs_list):
         db.close()
         ### DB close ###
     except:
+        logging('error while inserting %s'% title)
+        logging(str(sys.exc_info()))
         return False
     return True
 
@@ -138,8 +141,9 @@ def store_posts(topic_name, source_name, source):
     files = os.listdir(dirname)
     files.sort()
     for filename in files:
-        # skip already-inserted files
         logging('inserting file: %s' % filename)
+
+        # skip already-inserted files
         if '.'.join(filename.split('.')[0:-1]) in posts:
             logging('%s is already exists' % filename)
             continue
@@ -168,5 +172,4 @@ def store_posts(topic_name, source_name, source):
             logging('........ fail')
 
 if __name__ == '__main__':
-    store_posts(u'자살', 'twitter 07', 'posts_07')
-    # reset_db(u'자살', 'twitter 06')
+    store_posts(u'자살', 'twitter 08', 'posts_08')

@@ -372,7 +372,7 @@ def posts():
                     else:
                         post_ruleset_count_dic[post_id] = {category_seq: 1}
             except:
-                app.logger.error('GET post: redis read previous result error with key(%s)'%(ruld_id))
+                app.logger.error('GET post: redis read previous result error with key(%s)'%(rule_id))
                 rd.flushall()
 
         return jsonify(posts_count              = posts_count, \
@@ -662,4 +662,3 @@ if __name__ == '__main__':
     app.logger.addHandler(handler)
     # app.run(debug=True)
     app.run()
-

@@ -10,8 +10,8 @@ access_token = get_access_token()
 access_token_secret = get_access_token_secret()
 consumer_key = get_consumer_key()
 consumer_secret = get_consumer_secret()
-flogname = './crawl.log'
-destdir = './posts/posts_07'
+flogname = './log/crawl.log'
+destdir = './posts/posts_08'
 
 def logging(text):
     with open(flogname, 'a') as log:
@@ -48,9 +48,8 @@ if __name__=='__main__':
     texts = []
     created_ats = []
 
-    dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(27, 32))
-    daterange = ['2016-07-%s' % date for date in dates]
-    daterange.append('2016-08-01')
+    dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(5, 11))
+    daterange = ['2016-08-%s' % date for date in dates]
 
     for i in range(len(daterange)-1):
         j = 0
