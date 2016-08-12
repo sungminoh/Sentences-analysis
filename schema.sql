@@ -7,6 +7,7 @@ drop table if exists sentences;
 drop table if exists posts;
 drop table if exists topics;
 drop table if exists sources;
+drop table if exists rule_sentence_relations;
 
 /* [static] topic of an analysis */
 CREATE TABLE topics(
@@ -86,4 +87,14 @@ CREATE TABLE rule_word_relations(
     PRIMARY KEY (rule_id, word_seq),
     FOREIGN KEY (rule_id) REFERENCES rules(_id),
     FOREIGN KEY (word_id) REFERENCES words(_id)
+);
+
+/* store the analysis resuts */
+CREATE TABLE rule_sentence_relations(
+    rule_id INT.
+    post_id INT,
+    sentence_seq INT
+    PRIMARY KEY (rule_id, post_id, sentence_seq),
+    FOREIGN KEY (rule_id) REFERENCES rules(_id)
+    FOREIGN KEY (post_id, sentence_seq) REFERENCES sentences(post_id, sentence_seq)
 );

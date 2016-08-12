@@ -5,12 +5,13 @@ var ishover;
 var posts_count;
 var perpage;
 var lastpage;
-var post_ruleset_count_dic;
-var cur_page;
+//var post_ruleset_count_dic;
+var curpage;
 var chart;
 //var colors = "#e53939,#b2ff80,#3333cc,#661a1a,#073300,#7979f2,#cca099,#00ff00,#1d1a33,#330e00,#00ffaa,#a099cc,#f26100,#00997a,#583973,#732e00,#004033,#9b00a6,#e5a173,#ace6da,#ff00ee,#b39e86,#00e2f2,#40103d,#73561d,#4d8a99,#ff80d5,#e5b800,#00aaff,#ffbfea,#333000,#004b8c,#804059,#f2ff40,#b6d6f2,#cc335c,#a4b386,#434f59,#332628,#448000,#000f73".split(',')
-var colors = "#dbbbaf, #bfd9ad, #bae8e5, #a5abcf, #dfbae8, #deb1bd".split(', ')
-
+//var colors = "#dbbbaf, #bfd9ad, #bae8e5, #a5abcf, #dfbae8, #deb1bd".split(', ')
+var colors = "#8dd3c7, #ffffb3, #bebada, #fb8072, #80b1d3, #fdb462, #b3de69, #fccde5, #d9d9d9, #bc80bd, #ccebc5, #ffed6f".split(', ')
+var ruleset_color_map = {}
 
 function convertHex(hex,opacity){
     hex = hex.replace('#','');
@@ -38,6 +39,13 @@ function get_ruleset_by_id(category_seq){
 }
 function get_color_by_ruleset(ruleset_id){
     return colors[parseInt(ruleset_id)%(colors.length)];
+}
+function map_ruleset_to_color(rulesets){
+    for (var i=0; i<rulesets.length; i++){
+        var ruleset = rulesets[i];
+        var category_seq = ruleset.category_seq;
+        ruleset_color_map[category_seq] = colors[i%(colors.length)];
+    }
 }
 
 
@@ -109,7 +117,7 @@ var show_sentences = function(post_id, title, sentences){
             var color = null;
             if (title){
                 var ruleset_id = get_ruleset_by_rule(rules[0]);
-                color = get_color_by_ruleset(ruleset_id);
+                color = ruleset_color_map[ruleset_id];
             }else{
                 color = get_color_by_ruleset(rules[0]);
             }
@@ -216,7 +224,7 @@ var show_posts = function(posts){
 };
 
 var update_pagination = function(start, init=false){
-    var ul = $('#pagination-ul');
+    var ul =$('#pagination-ul');
     curpage = start;
 
     ul.empty();
@@ -289,6 +297,7 @@ var event_bind_pagination = function(){
     $(document).on('click', 'a[name=pagination-a]', function(){
         $(this).parent().siblings('li').removeClass('active');
         $(this).parent().addClass('active');
+        curpage = this.getAttribute('value');
         jQuery.ajax({
             type: 'GET',
             url: '/_posts_by_page',
@@ -301,7 +310,7 @@ var event_bind_pagination = function(){
             success: function(data){
                 clear_posts();
                 show_posts(data.posts);
-                update_post_badge();
+                update_post_badge(data.post_ruleset_count_dic);
             },
             error: function(xhr, status, error){
                 console.log('get posts failed');
@@ -439,7 +448,7 @@ var update_rule_badge = function(rule_count_dic){
         }
     }
 }
-var update_post_badge = function(){
+var update_post_badge = function(post_ruleset_count_dic){
     $('td[name=post-td]').empty();
     $.each(post_ruleset_count_dic, function(post_id, ruleset_count_dic){
         $('#post-td-'+post_id).append(
@@ -456,7 +465,7 @@ var update_post_badge = function(){
         }
         $.each(ruleset_count_dic, function(category_seq, count){
             count = parseInt(count);
-            var color = get_color_by_ruleset(category_seq);
+            var color = ruleset_color_map[category_seq];
             $('#post-td-div-progress-'+post_id).append(
                 $('<div>').attr({
                     'class':'progress-bar progress-bar-success',
@@ -473,10 +482,12 @@ var show_rulesets = function(rulesets){
     $(document).off('click', 'button[name=delete-ruleset-btn]');
     $(document).off('mouseenter', '.ruleset-button');
     $(document).off('mouseleave', '.ruleset-button');
+    $('#rulesets').off('click', 'li');
     $('#ruleset-creator-ul').css('display', 'block');
+    map_ruleset_to_color(rulesets);
     $.each(rulesets, function(){
         var category_seq = this.category_seq;
-        var color = get_color_by_ruleset(category_seq);
+        var color = ruleset_color_map[category_seq];
         var name = this.name;
         $('#rulesets').prepend(
             $('<li>').attr({
@@ -597,7 +608,7 @@ var get_chart_data = function(rulesets, ruleset_rules_dic, rule_count_dic){
             ruleset_count += parseInt(rule_count_dic[rule_id]);
         }
         if(ruleset_count == 0) continue;
-        colors.push({'color': get_color_by_ruleset(category_seq)});
+        colors.push({'color': ruleset_color_map[category_seq]});
         rulesets_count.push([ruleset_name, ruleset_count]);
     }
     var option = get_chart_option();
@@ -613,7 +624,7 @@ var get_chart_data_after_run = function(){
         var category_seq = ruleset_badge.id.split('-').pop();
         var ruleset_count = parseInt(ruleset_badge.innerHTML);
         var ruleset_name = $('#ruleset-a-'+category_seq).clone().children().remove().end().text();
-        colors.push({'color': get_color_by_ruleset(category_seq)});
+        colors.push({'color': ruleset_color_map[category_seq]});
         rulesets_count.push([ruleset_name, ruleset_count]);
     }
     var option = get_chart_option();
@@ -676,7 +687,7 @@ var main = function(){
                 show_rules(data.ruleset_rules_dic, data.rule_count_dic);
 
                 post_ruleset_count_dic = data.post_ruleset_count_dic;
-                update_post_badge();
+                update_post_badge(post_ruleset_count_dic);
 
                 var chart_data = get_chart_data(data.rulesets, data.ruleset_rules_dic, data.rule_count_dic);
                 chart.draw(chart_data.data, chart_data.option);
@@ -772,7 +783,8 @@ var main = function(){
             url: '/_analysis',
             data: {
                 'topic': JSON.stringify(topic),
-                'sources': JSON.stringify(sources)
+                'sources': JSON.stringify(sources),
+                'page': JSON.stringify(curpage)
             },
             dataType: 'JSON',
             success: function(data){
