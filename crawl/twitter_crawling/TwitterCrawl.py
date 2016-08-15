@@ -1,8 +1,7 @@
 # coding: utf-8
-
 import tweepy as tw
-import traceback
 from time import strftime, sleep
+from datetime import date, timedelta
 import os
 from twitter_keys import get_access_token, get_access_token_secret, get_consumer_key, get_consumer_secret
 
@@ -10,12 +9,25 @@ access_token = get_access_token()
 access_token_secret = get_access_token_secret()
 consumer_key = get_consumer_key()
 consumer_secret = get_consumer_secret()
+
+os.chdir('/home/zenixwp/Sentences-analysis/crawl/twitter_crawling')
 flogname = './log/crawl.log'
-destdir = './posts/posts_08'
+destdir = './posts'
+today = date.today()
+yesterday = today - timedelta(1)
+daterange = [yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')]
+month = yesterday.month
+monthstr = '0' + str(month) if month < 10 else str(month)
+targetdir = 'posts_' + monthstr
+destdir = os.path.join(destdir, targetdir)
+# dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(12, 14))
+# daterange = ['2016-08-%s' % date for date in dates]
+
 
 def logging(text):
     with open(flogname, 'a') as log:
         log.write('[%s] %s \n' %(strftime('%Y-%m-%d %H:%M:%S'), text))
+
 
 def save_texts(texts, created_ats):
     # get string
@@ -38,31 +50,27 @@ def save_texts(texts, created_ats):
         logging('%s Write Exception' % fname)
 
 
-if __name__=='__main__':
+def main():
     auth = tw.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
 
     api = tw.API(auth)
 
-    fname = None
     texts = []
     created_ats = []
-
-    dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(5, 11))
-    daterange = ['2016-08-%s' % date for date in dates]
 
     for i in range(len(daterange)-1):
         j = 0
         logging('crawl started since %s, until %s' %(daterange[i], daterange[i+1]))
         cur = tw.Cursor(api.search, q=u'자살', since=daterange[i], until=daterange[i+1], lang='ko').items()
-        logging(' --- SUCCESS')
+        logging(' --- CONNECT TWITTER SUCCESS')
         while True:
             try:
                 tweet  = cur.next()
             except tw.TweepError:
                 logging('Sleep')
                 sleep(60*15)
-                logging(' --- SUCCESS')
+                logging(' --- wake up')
                 continue
             except StopIteration:
                 logging('Stop Iteration')
@@ -84,6 +92,11 @@ if __name__=='__main__':
                 if not texts: continue
                 save_texts(texts, created_ats)
 
-        logging('%s - %s is done' %(daterange[i], daterange[i+1]))
+        logging('%s - %s is done, saved in %s' %(daterange[i], daterange[i+1], destdir))
 
     logging('Stop Crawling')
+
+
+if __name__=='__main__':
+    logging('cron calls')
+    main()

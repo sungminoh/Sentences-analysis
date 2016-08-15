@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import MySQLdb as mdb
-import traceback
 import os
+os.chdir('/home/zenixwp/Sentences-analysis/crawl/twitter_crawling')
 from time import strftime
 import imp
 parsing = imp.load_source('parsing', '../../modules/parsing.py')
