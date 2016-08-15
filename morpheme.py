@@ -57,10 +57,13 @@ queries = {
     # param: topic_id, source_id, title, url
     'add_post'                  :   'INSERT INTO posts (topic_id, source_id, title, url, timestamp) VALUES (%s, %s, %s, %s, %s)',
 
-    'get_posts_count'           :   'SELECT COUNT(*) FROM posts WHERE topic_id = {} AND source_id in ({})',
+    'get_posts_count'           :   'SELECT COUNT(*) FROM posts WHERE topic_id = {} AND source_id in ({}) AND timestamp BETWEEN "{}" AND "{}"',
 
     # param: topic_id, source_ids_string
     'get_posts'                 :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({})',
+    'get_posts_from'            :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({}) AND timestamp >= "{}"',
+    'get_posts_to'              :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({}) AND timestamp <= "{}"',
+    'get_posts_between'         :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({}) AND timestamp BETWEEN "{}" AND "{}"',
 
     # param: post_id, sentence_seq, full_text
     'add_sentence'              :   'INSERT INTO sentences (post_id, sentence_seq, full_text) VALUES (%s, %s, %s)',
@@ -81,15 +84,20 @@ queries = {
 
     'get_sentences_by_rule'     :   'SELECT  (@rnum:=@rnum+1) AS rnum, s.full_text\
                                      FROM    sentences AS s\
+                                     JOIN    posts AS p\
+                                     ON      p._id = s.post_id\
                                      JOIN    (SELECT post_id, sentence_seq\
                                               FROM   rule_sentence_relations\
                                               WHERE  rule_id = %s) AS t\
                                      ON      s.post_id = t.post_id\
                                      AND     s.sentence_seq = t.sentence_seq\
-                                     JOIN    (SELECT @rnum:=-1) AS r',
+                                     JOIN    (SELECT @rnum:=-1) AS r\
+                                     WHERE   p.topic_id = %s AND source_id in (%s)',
 
     'get_sentences_by_ruleset'  :   'SELECT  (@rnum:=@rnum+1) AS rnum, s.full_text, t.rule_ids\
                                      FROM    sentences AS s\
+                                     JOIN    posts AS p\
+                                     ON      p._id = s.post_id\
                                      JOIN    (SELECT rel.post_id, rel.sentence_seq, GROUP_CONCAT(rel.rule_id SEPARATOR ",") AS rule_ids\
                                              FROM   rule_sentence_relations AS rel\
                                              JOIN   rules\
@@ -98,7 +106,8 @@ queries = {
                                              GROUP BY rel.post_id, rel.sentence_seq) AS t\
                                      ON      s.post_id = t.post_id\
                                      AND     s.sentence_seq = t.sentence_seq\
-                                     JOIN    (SELECT @rnum:=-1) AS r',
+                                     JOIN    (SELECT @rnum:=-1) AS r\
+                                     WHERE   p.topic_id = %s AND source_id in (%s)',
 
     # param: topic, sentence_seqs
     'get_post_sentences_rel'    :   'SELECT post_id, sentence_seq FROM (%s) AS t WHERE rnum IN (%s)',
@@ -216,7 +225,8 @@ queries = {
                                                      join (SELECT _id AS post_id\
                                                          FROM   posts\
                                                          WHERE  topic_id = %s\
-                                                                 AND source_id IN (%s)) AS p\
+                                                         AND    source_id IN (%s)\
+                                                         AND    timestamp BETWEEN "{}" AND "{}") AS p\
                                                      ON r.post_id = p.post_id\
                                                      join (SELECT _id AS rule_id\
                                                          FROM   rules\
@@ -233,6 +243,7 @@ queries = {
                                              FROM   posts\
                                              WHERE  topic_id = %s\
                                              AND    source_id IN (%s)\
+                                             AND    timestamp BETWEEN "{}" AND "{}"\
                                              LIMIT  %s, %s) AS c\
                                      ON     c.topic_id = b.topic_id\
                                      AND    c._id = a.post_id\
@@ -373,17 +384,26 @@ def initialize_page():
     return render_template('show_posts.html', topics=topics, sources=sources)
 
 
-def get_post_between(cur, topic, sources_ids, start, number):
-    cur.execute(queries['get_posts'].format('{}', formatstringBracket(sources_ids))\
-                                    .format(topic, *sources_ids) + 'LIMIT %s, %s'%(start, number))
+def format_toDate(toDate):
+    return toDate + ' 23:59:59' if toDate else '9999-12-31 23:59:59'
+
+def format_fromDate(fromDate):
+    return fromDate + ' 00:00:00' if fromDate else ''
+
+
+def get_post_between(cur, topic, sources_ids, start, number, fromDate, toDate):
+    params = [topic] + sources_ids + [fromDate, toDate]
+    cur.execute(queries['get_posts_between'].format('{}', formatstringBracket(sources_ids), '{}', '{}')\
+                                                .format(*params) + 'LIMIT %s, %s'%(start, number))
     return cur
 
 
-def get_post_ruleset_count_dic(cur, topic, sources_ids, start, end):
+def get_post_ruleset_count_dic(cur, topic, sources_ids, start, num, fromDate, toDate):
     format_string = formatstring(sources_ids)
     post_ruleset_count_dic = {}
-    cur.execute(queries['get_result_by_post']%('%s', format_string, '%s', '%s'),\
-                [topic] + sources_ids + [start, end])
+    cur.execute(queries['get_result_by_post'].format(fromDate, toDate)\
+                %('%s', format_string, '%s', '%s'),\
+                [topic] + sources_ids + [start, num])
 
     for row in cur.fetchall():
         post_id, category_seq, count = map(int, row)
@@ -395,14 +415,14 @@ def get_post_ruleset_count_dic(cur, topic, sources_ids, start, end):
     return post_ruleset_count_dic
 
 
-def get_rule_count_dic(cur, topic, sources_ids):
+def get_rule_count_dic(cur, topic, sources_ids, fromDate, toDate):
     format_string = formatstring(sources_ids)
     cur.execute(queries['get_all_rules'], (topic, ))
-    # rule_count_dic = {row[0]: 0 for row in cur.fetchall()}
     rd = g.rd
     rule_count_dic = {k: 0 for k in map(long, rd.keys())}
 
-    cur.execute(queries['get_result_by_rule']%('%s', format_string, '%s'), [topic]+sources_ids+[topic] )
+    cur.execute(queries['get_result_by_rule'].format(fromDate, toDate)\
+                %('%s', format_string, '%s'), [topic]+sources_ids+[topic] )
     for row in cur.fetchall():
         rule_count_dic[row[0]] = row[1]
     return rule_count_dic
@@ -415,16 +435,22 @@ def posts():
         sources_ids = ast.literal_eval(request.args.get('sources'))
         format_string = formatstring(sources_ids)
         format_string_bracket = formatstringBracket(sources_ids)
+        fromDate = format_fromDate(ast.literal_eval(request.args.get('fromDate')))
+        toDate = format_toDate(ast.literal_eval(request.args.get('toDate')))
 
-        app.logger.info('GET posts: topic(%s), sources_ids(%s)'%('%s', format_string)%tuple([topic]+sources_ids))
+        app.logger.info('GET posts: topic(%s), sources_ids(%s), from(%s), to(%s)'\
+                        %('%s', format_string, '%s', '%s')\
+                        %tuple([topic]+sources_ids+[fromDate, toDate]))
 
         db = g.db
         cur = db.cursor()
 
-        cur.execute(queries['get_posts_count'].format('{}', format_string_bracket).format(topic, *sources_ids))
+        params = [topic] + sources_ids + [fromDate, toDate]
+        cur.execute(queries['get_posts_count'].format('{}', format_string_bracket, '{}', '{}')\
+                                              .format(*params))
         posts_count = cur.fetchall()[0][0]
 
-        get_post_between(cur, topic, sources_ids, 0, config['perpage'])
+        get_post_between(cur, topic, sources_ids, 0, config['perpage'], fromDate, toDate)
         posts = [dict(id=int(row[0]), title=row[1], url=row[2], timestamp=row[3]) for row in cur.fetchall()]
 
         cur.execute(queries['get_rulesets'], (topic, ))
@@ -449,9 +475,9 @@ def posts():
             rules = [dict(rule_id=int(key), word=val) for key, val in rule_dic.iteritems()]
             ruleset_rules_dic[category_seq] = rules
 
-        rule_count_dic = get_rule_count_dic(cur, topic, sources_ids)
+        rule_count_dic = get_rule_count_dic(cur, topic, sources_ids, fromDate, toDate)
 
-        post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, 0, config['perpage'])
+        post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, 0, config['perpage'], fromDate, toDate)
 
         return jsonify(posts_count              = posts_count, \
                        posts                    = posts, \
@@ -469,17 +495,21 @@ def posts_by_page():
         format_string = formatstring(sources_ids)
         format_string_bracket = formatstringBracket(sources_ids)
         page = ast.literal_eval(request.args.get('page'))
+        fromDate = format_fromDate(ast.literal_eval(request.args.get('fromDate')))
+        toDate = format_toDate(ast.literal_eval(request.args.get('toDate')))
 
-        # app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s)'%('%s', format_string, '%s')%tuple([topic]+[sources_ids]+[page]))
+        app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s), from(%s), to(%s)'\
+                        %('%s', format_string, '%s', '%s', '%s')\
+                        %tuple([topic]+sources_ids+[page, fromDate, toDate]))
 
         db = g.db
         cur = db.cursor()
 
         from_post_rnum = (page-1)*config['perpage']
-        get_post_between(cur, topic, sources_ids, from_post_rnum, config['perpage'])
+        get_post_between(cur, topic, sources_ids, from_post_rnum, config['perpage'], fromDate, toDate)
         posts = [dict(id=int(row[0]), title=row[1], url=row[2], timestamp=row[3]) for row in cur.fetchall()]
 
-        post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, from_post_rnum, config['perpage'])
+        post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, from_post_rnum, config['perpage'], fromDate, toDate)
 
         return jsonify(posts                    = posts,\
                        post_ruleset_count_dic   = post_ruleset_count_dic)
@@ -523,13 +553,13 @@ def sentences_by_rule():
 
         sentences = []
         if isRuleset:
-            cur.execute(queries['get_sentences_by_ruleset'], (rule_id, ))
+            cur.execute(queries['get_sentences_by_ruleset']%('%s', '%s', format_string), [rule_id, topic] + sources_ids)
             sentences.extend([dict(sentence_id  = row[0],\
                                    full_text    = row[1],\
                                    rules        = map(int, row[2].split(',')))\
                               for row in cur.fetchall()])
         else:
-            cur.execute(queries['get_sentences_by_rule'], (rule_id, ))
+            cur.execute(queries['get_sentences_by_rule']%('%s', '%s', format_string), [rule_id, topic] + sources_ids)
             sentences.extend([dict(sentence_id  = row[0],\
                                    full_text    = row[1],\
                                    rules        = [])\
@@ -670,6 +700,8 @@ def analysis():
         sources_ids = ast.literal_eval(request.form['sources'])
         source_format_string = formatstring(sources_ids)
         page = ast.literal_eval(request.form['page'])
+        fromDate = format_fromDate(ast.literal_eval(request.form['fromDate']))
+        toDate = format_toDate(ast.literal_eval(request.form['toDate']))
 
         app.logger.info('POST anaysis: topic(%s), sources_ids(%s)'%('%s', source_format_string)%tuple([topic]+sources_ids))
 
@@ -677,10 +709,10 @@ def analysis():
 
         db = g.db
         cur = db.cursor()
-        rule_count_dic = get_rule_count_dic(cur, topic, sources_ids)
+        rule_count_dic = get_rule_count_dic(cur, topic, sources_ids, fromDate, toDate)
 
         from_post_rnum = (page-1)*config['perpage']
-        post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, from_post_rnum, config['perpage'])
+        post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, from_post_rnum, config['perpage'], fromDate, toDate)
 
     return jsonify(rule_count_dic           = rule_count_dic,\
                    post_ruleset_count_dic   = post_ruleset_count_dic)

@@ -1,5 +1,7 @@
 var topic;
 var sources;
+var fromDate;
+var toDate;
 var ruleText;
 var ishover;
 var posts_count;
@@ -269,6 +271,9 @@ var update_pagination = function(start, init=false){
 
 }
 var event_bind_pagination = function(){
+	$(document).off('click', 'a[name=pagination-a]');
+    $(document).off('click', '#pagination-prev-a');
+    $(document).off('click', '#pagination-next-a');
     var ul = $('#pagination-ul');
     $(document).on('click', '#pagination-next-a', function(){
         var start = (Math.floor((curpage-1)/perpage)+1) * perpage + 1;
@@ -304,7 +309,9 @@ var event_bind_pagination = function(){
             data: {
                 'topic': topic,
                 'sources':JSON.stringify(sources),
-                'page': this.getAttribute('value')
+                'page': this.getAttribute('value'),
+				'fromDate': JSON.stringify(fromDate),
+				'toDate': JSON.stringify(toDate)
             },
             dataType: 'JSON',
             success: function(data){
@@ -665,12 +672,16 @@ var main = function(){
         topic = $("#topics").val();
         if(!topic) return;
         sources = $("#sources").val();
+		fromDate = $("#fromDate").val();
+		toDate = $("#toDate").val();
         jQuery.ajax({
             type: 'GET',
             url: '/_posts',
             data: {
                 'topic': JSON.stringify(topic),
-                'sources': JSON.stringify(sources)
+                'sources': JSON.stringify(sources),
+				'fromDate': JSON.stringify(fromDate),
+				'toDate': JSON.stringify(toDate)
             },
             dataType: 'JSON',
             success: function(data){
@@ -784,7 +795,9 @@ var main = function(){
             data: {
                 'topic': JSON.stringify(topic),
                 'sources': JSON.stringify(sources),
-                'page': JSON.stringify(curpage)
+                'page': JSON.stringify(curpage),
+				'fromDate': JSON.stringify(fromDate),
+				'toDate': JSON.stringify(toDate)
             },
             dataType: 'JSON',
             success: function(data){
@@ -794,10 +807,13 @@ var main = function(){
                 chart.draw(chart_data.data, chart_data.option);
             },
             error: function(xhr, status, error){
-                console.log('run fail');
+                alert("데이터 처리에 많은 시간이 소요되고 있습니다.\n잠시후 다시 GET을 눌러주세요");
             }
         });
     });
+    $('.input-daterange').datepicker({
+		format: "yyyy-mm-dd"
+	});
 };
 
 $(document).ready(main);

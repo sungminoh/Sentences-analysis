@@ -16,6 +16,7 @@
         <link rel="stylesheet" type="text/css" href="../static/bootstrap_select/bootstrap-select.min.css">
         <link rel="stylesheet" type="text/css" href="../static/jasny_bootstrap/jasny-bootstrap.min.css">
         <link rel="stylesheet" type="text/css" href="../static/jasny_bootstrap/navmenu.css">
+        <link rel="stylesheet" type="text/css" href="../static/bootstrap-datepicker/bootstrap-datepicker.css"></script>
 
 
         <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
@@ -59,6 +60,11 @@
                         </option>
                         {% endfor %}
                     </select>
+                    <div class="input-daterange input-group" id="datepicker">
+                      <input type="text" class="input-sm form-control" name="start" id="fromDate"/>
+                      <span class="input-group-addon">to</span>
+                      <input type="text" class="input-sm form-control" name="end" id="toDate"/>
+                    </div>
                     <button class="btn btn-default" type="button" id="getPosts">Get</button>
                 </div>
             </ul>
@@ -212,6 +218,7 @@
             <script src="../static/bootstrap/js/bootstrap.min.js"></script>
             <script type"text/javascript" src="../static/bootstrap_select/bootstrap-select.min.js"></script>
             <script type"text/javascript" src="../static/jasny_bootstrap/jasny-bootstrap.min.js"></script>
+            <script type"text/javascript" src="../static/bootstrap-datepicker/bootstrap-datepicker.js"></script>
             <!-- google chart -->
             <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
              <!--IE10 viewport hack for Surface/desktop Windows 8 bug -->
