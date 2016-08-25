@@ -27,8 +27,6 @@ app = Flask(__name__)
 # celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 # celery.conf.update(app.config)
 
-
-
 # Should be modified later. this is just from tutorial.
 app.config.update(dict(
     DATABASE = '/tmp/morpheme.db',
@@ -37,6 +35,7 @@ app.config.update(dict(
     USERNAME = 'admin',
     PASSWORD = 'default'
     ))
+
 app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
 config = dict(
@@ -60,9 +59,6 @@ queries = {
     'get_posts_count'           :   'SELECT COUNT(*) FROM posts WHERE topic_id = {} AND source_id in ({}) AND timestamp BETWEEN "{}" AND "{}"',
 
     # param: topic_id, source_ids_string
-    'get_posts'                 :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({})',
-    'get_posts_from'            :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({}) AND timestamp >= "{}"',
-    'get_posts_to'              :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({}) AND timestamp <= "{}"',
     'get_posts_between'         :   'SELECT _id, title, url, DATE_FORMAT(timestamp, "%Y/%m/%d") FROM posts WHERE topic_id = {} AND source_id IN ({}) AND timestamp BETWEEN "{}" AND "{}"',
 
     # param: post_id, sentence_seq, full_text
@@ -92,7 +88,8 @@ queries = {
                                      ON      s.post_id = t.post_id\
                                      AND     s.sentence_seq = t.sentence_seq\
                                      JOIN    (SELECT @rnum:=-1) AS r\
-                                     WHERE   p.topic_id = %s AND source_id in (%s)',
+                                     WHERE   p.topic_id = %s AND source_id in (%s)\
+                                     AND     p.timestamp BETWEEN "{}" AND "{}"',
 
     'get_sentences_by_ruleset'  :   'SELECT  (@rnum:=@rnum+1) AS rnum, s.full_text, t.rule_ids\
                                      FROM    sentences AS s\
@@ -107,7 +104,8 @@ queries = {
                                      ON      s.post_id = t.post_id\
                                      AND     s.sentence_seq = t.sentence_seq\
                                      JOIN    (SELECT @rnum:=-1) AS r\
-                                     WHERE   p.topic_id = %s AND source_id in (%s)',
+                                     WHERE   p.topic_id = %s AND source_id in (%s)\
+                                     AND     p.timestamp BETWEEN "{}" AND "{}"',
 
     # param: topic, sentence_seqs
     'get_post_sentences_rel'    :   'SELECT post_id, sentence_seq FROM (%s) AS t WHERE rnum IN (%s)',
@@ -260,9 +258,11 @@ def connect_db():
     conn = mdb.connect(**mysql_info())
     return conn
 
+
 def connect_redis():
     rd = redis.StrictRedis(**redis_info())
     return rd
+
 
 # Only execute at the first time.
 def init_db():
@@ -275,7 +275,8 @@ def init_db():
             query = ''
             while(True):
                 query_line = f.readline()
-                if not query_line: break
+                if not query_line:
+                    break
                 query += query_line
                 if ';' in query:
                     print query
@@ -284,12 +285,14 @@ def init_db():
                     query = ''
     db.close()
 
+
 # not used
 def build_bitarray(length, index_array):
     bitarray = [False]*length
     for i in index_array:
         bitarray[i] = True
     return bitarray
+
 
 # not used
 def build_redis():
@@ -304,14 +307,18 @@ def build_redis():
             pipe.setbit('word_'+str(row[0]), i, 1)
     pipe.execute()
 
+
 def tuplize(s):
     return (s,)
+
 
 def formatstring(arr):
     if type(arr) == list:
         return ', '.join(['%s']*len(arr))
     else:
         return '%s'
+
+
 def formatstringBracket(arr):
     if type(arr) == list:
         return ', '.join(['{}']*len(arr))
@@ -329,10 +336,10 @@ def store_posts(topic_name, source_name):
     source_id = cur.lastrowid
 
     files = crawl()
-    print files;
+    print files
     for fname in files:
         f = open(fname)
-        print 'inserting %s' %fname
+        print 'inserting %s' % fname
 
         lines = convert_textfile_to_lines(f)
 
@@ -346,7 +353,7 @@ def store_posts(topic_name, source_name):
         post_id = cur.lastrowid
 
         sentences = do_sentencing_without_threading(lines)
-        for i in range (len(sentences)):
+        for i in range(len(sentences)):
             # insert sentence
             sentence = sentences[i]
             cur.execute(queries['add_sentence'], (post_id, i, sentence))
@@ -363,14 +370,17 @@ def store_posts(topic_name, source_name):
         print 'Done'
     db.close()
 
+
 @app.before_request
 def before_request():
     g.db = connect_db()
     g.rd = connect_redis()
 
+
 @app.teardown_request
 def teardown_request(exception):
     g.db.close()
+
 
 @app.route('/')
 def initialize_page():
@@ -387,22 +397,24 @@ def initialize_page():
 def format_toDate(toDate):
     return toDate + ' 23:59:59' if toDate else '9999-12-31 23:59:59'
 
+
 def format_fromDate(fromDate):
     return fromDate + ' 00:00:00' if fromDate else ''
 
 
 def get_post_between(cur, topic, sources_ids, start, number, fromDate, toDate):
     params = [topic] + sources_ids + [fromDate, toDate]
-    cur.execute(queries['get_posts_between'].format('{}', formatstringBracket(sources_ids), '{}', '{}')\
-                                                .format(*params) + 'LIMIT %s, %s'%(start, number))
+    cur.execute(queries['get_posts_between']
+                .format('{}', formatstringBracket(sources_ids), '{}', '{}')
+                .format(*params) + 'LIMIT %s, %s' % (start, number))
     return cur
 
 
 def get_post_ruleset_count_dic(cur, topic, sources_ids, start, num, fromDate, toDate):
     format_string = formatstring(sources_ids)
     post_ruleset_count_dic = {}
-    cur.execute(queries['get_result_by_post'].format(fromDate, toDate)\
-                %('%s', format_string, '%s', '%s'),\
+    cur.execute(queries['get_result_by_post'].format(fromDate, toDate)
+                % ('%s', format_string, '%s', '%s'),
                 [topic] + sources_ids + [start, num])
 
     for row in cur.fetchall():
@@ -421,8 +433,8 @@ def get_rule_count_dic(cur, topic, sources_ids, fromDate, toDate):
     rd = g.rd
     rule_count_dic = {k: 0 for k in map(long, rd.keys())}
 
-    cur.execute(queries['get_result_by_rule'].format(fromDate, toDate)\
-                %('%s', format_string, '%s'), [topic]+sources_ids+[topic] )
+    cur.execute(queries['get_result_by_rule'].format(fromDate, toDate)
+                % ('%s', format_string, '%s'), [topic] + sources_ids + [topic])
     for row in cur.fetchall():
         rule_count_dic[row[0]] = row[1]
     return rule_count_dic
@@ -438,15 +450,15 @@ def posts():
         fromDate = format_fromDate(ast.literal_eval(request.args.get('fromDate')))
         toDate = format_toDate(ast.literal_eval(request.args.get('toDate')))
 
-        app.logger.info('GET posts: topic(%s), sources_ids(%s), from(%s), to(%s)'\
-                        %('%s', format_string, '%s', '%s')\
-                        %tuple([topic]+sources_ids+[fromDate, toDate]))
+        app.logger.info('GET posts: topic(%s), sources_ids(%s), from(%s), to(%s)'
+                        % ('%s', format_string, '%s', '%s')
+                        % tuple([topic] + sources_ids + [fromDate, toDate]))
 
         db = g.db
         cur = db.cursor()
 
         params = [topic] + sources_ids + [fromDate, toDate]
-        cur.execute(queries['get_posts_count'].format('{}', format_string_bracket, '{}', '{}')\
+        cur.execute(queries['get_posts_count'].format('{}', format_string_bracket, '{}', '{}')
                                               .format(*params))
         posts_count = cur.fetchall()[0][0]
 
@@ -479,11 +491,11 @@ def posts():
 
         post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, 0, config['perpage'], fromDate, toDate)
 
-        return jsonify(posts_count              = posts_count, \
-                       posts                    = posts, \
-                       rulesets                 = rulesets, \
-                       ruleset_rules_dic        = ruleset_rules_dic, \
-                       rule_count_dic           = rule_count_dic, \
+        return jsonify(posts_count              = posts_count,
+                       posts                    = posts,
+                       rulesets                 = rulesets,
+                       ruleset_rules_dic        = ruleset_rules_dic,
+                       rule_count_dic           = rule_count_dic,
                        post_ruleset_count_dic   = post_ruleset_count_dic)
 
 
@@ -493,14 +505,13 @@ def posts_by_page():
         topic = ast.literal_eval(request.args.get('topic'))
         sources_ids = ast.literal_eval(request.args.get('sources'))
         format_string = formatstring(sources_ids)
-        format_string_bracket = formatstringBracket(sources_ids)
         page = ast.literal_eval(request.args.get('page'))
         fromDate = format_fromDate(ast.literal_eval(request.args.get('fromDate')))
         toDate = format_toDate(ast.literal_eval(request.args.get('toDate')))
 
-        app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s), from(%s), to(%s)'\
-                        %('%s', format_string, '%s', '%s', '%s')\
-                        %tuple([topic]+sources_ids+[page, fromDate, toDate]))
+        app.logger.info('GET posts_by_page: topic(%s), sources_ids(%s), page(%s), from(%s), to(%s)'
+                        % ('%s', format_string, '%s', '%s', '%s')
+                        % tuple([topic] + sources_ids + [page, fromDate, toDate]))
 
         db = g.db
         cur = db.cursor()
@@ -511,8 +522,9 @@ def posts_by_page():
 
         post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, from_post_rnum, config['perpage'], fromDate, toDate)
 
-        return jsonify(posts                    = posts,\
+        return jsonify(posts                    = posts,
                        post_ruleset_count_dic   = post_ruleset_count_dic)
+
 
 @app.route('/_sentences', methods=['GET'])
 def sentences():
@@ -522,7 +534,9 @@ def sentences():
         format_string = formatstring(sources_ids)
         post_id = ast.literal_eval(request.args.get('post_id'))
 
-        app.logger.info('GET sentneces: topic(%s), sources_ids(%s), post_id(%s)'%('%s',format_string, '%s')%tuple([topic]+sources_ids+[post_id]))
+        app.logger.info('GET sentneces: topic(%s), sources_ids(%s), post_id(%s)'
+                        % ('%s', format_string, '%s')
+                        % tuple([topic]+sources_ids+[post_id]))
 
         cur = g.db.cursor()
         cur.execute(queries['get_sentences'], (post_id, ))
@@ -536,6 +550,7 @@ def sentences():
             sentences.append(dict(sentence_id=sentence_id, full_text=full_text, rules=rules))
         return jsonify(sentences=sentences)
 
+
 @app.route('/_sentences_by_rule', methods=['GET'])
 def sentences_by_rule():
     if request.method == 'GET':
@@ -544,28 +559,34 @@ def sentences_by_rule():
         format_string = formatstring(sources_ids)
         isRuleset = True if request.args.get('isRuleset') == 'true' else False
         rule_id = ast.literal_eval(request.args.get('rule_id'))
+        fromDate = format_fromDate(ast.literal_eval(request.args.get('fromDate')))
+        toDate = format_toDate(ast.literal_eval(request.args.get('toDate')))
 
-        app.logger.info('GET sentences_by_rule: topic(%s), sources_ids(%s), isRuleset(%s), ruleset_or_rule_id(%s)'\
-                %('%s',format_string, '%s', '%s')%tuple([topic]+sources_ids+[isRuleset, rule_id]))
+        app.logger.info('GET sentences_by_rule: topic(%s), sources_ids(%s), isRuleset(%s), ruleset_or_rule_id(%s)'
+                        % ('%s', format_string, '%s', '%s')
+                        % tuple([topic] + sources_ids + [isRuleset, rule_id]))
 
         db = g.db
         cur = db.cursor()
 
         sentences = []
         if isRuleset:
-            cur.execute(queries['get_sentences_by_ruleset']%('%s', '%s', format_string), [rule_id, topic] + sources_ids)
-            sentences.extend([dict(sentence_id  = row[0],\
-                                   full_text    = row[1],\
-                                   rules        = map(int, row[2].split(',')))\
+            cur.execute(queries['get_sentences_by_ruleset'].format(fromDate, toDate)
+                        % ('%s', '%s', format_string), [rule_id, topic] + sources_ids)
+            sentences.extend([dict(sentence_id  = row[0],
+                                   full_text    = row[1],
+                                   rules        = map(int, row[2].split(',')))
                               for row in cur.fetchall()])
         else:
-            cur.execute(queries['get_sentences_by_rule']%('%s', '%s', format_string), [rule_id, topic] + sources_ids)
-            sentences.extend([dict(sentence_id  = row[0],\
-                                   full_text    = row[1],\
-                                   rules        = [])\
+            cur.execute(queries['get_sentences_by_rule'].format(fromDate, toDate)
+                        % ('%s', '%s', format_string), [rule_id, topic] + sources_ids)
+            sentences.extend([dict(sentence_id  = row[0],
+                                   full_text    = row[1],
+                                   rules        = [])
                               for row in cur.fetchall()])
 
         return jsonify(sentences=sentences)
+
 
 @app.route('/_rulesets', methods=['POST', 'DELETE'])
 def rulesets():
@@ -573,7 +594,7 @@ def rulesets():
         topic = ast.literal_eval(request.form['topic'])
         name = request.form['name']
 
-        app.logger.info('POST rulesets: topic(%s), name(%s)'%(topic, name))
+        app.logger.info('POST rulesets: topic(%s), name(%s)' % (topic, name))
 
         db = g.db
         cur = db.cursor()
@@ -587,7 +608,7 @@ def rulesets():
         topic = ast.literal_eval(request.form['topic'])
         category_seq = ast.literal_eval(request.form['category_seq'])
 
-        app.logger.info('DELETE rulesets: topic(%s), category_seq(%s)'%(topic, category_seq))
+        app.logger.info('DELETE rulesets: topic(%s), category_seq(%s)' % (topic, category_seq))
 
         db = g.db
         cur = db.cursor()
@@ -607,10 +628,11 @@ def rulesets():
 def parsing():
     text = request.args.get('text')
 
-    app.logger.info('GET parsing: text(%s)'%(text))
+    app.logger.info('GET parsing: text(%s)' % (text))
 
     jpype.attachThreadToJVM()
     return jsonify(morphs=do_parsing_without_threading(text))
+
 
 @app.route('/_rules', methods=['POST', 'DELETE'])
 def rules():
@@ -620,7 +642,9 @@ def rules():
         ruleText = request.form['ruleText']
         checked = ast.literal_eval(request.form['checked'])
 
-        app.logger.info('POST rules: text(%s), words(%s)'%('%s', formatstring(checked))%tuple([ruleText]+checked))
+        app.logger.info('POST rules: text(%s), words(%s)'
+                        % ('%s', formatstring(checked))
+                        % tuple([ruleText] + checked))
 
         db = g.db
         cur = db.cursor()
@@ -640,7 +664,7 @@ def rules():
     elif request.method == 'DELETE':
         rule_id = ast.literal_eval(request.form['rule_id'])
 
-        app.logger.info('DELETE rules: rule_id(%s)'%(rule_id))
+        app.logger.info('DELETE rules: rule_id(%s)' % (rule_id))
 
         rd = g.rd
         if rd.exists(rule_id):
@@ -653,17 +677,20 @@ def rules():
         db.commit()
         return jsonify(deleted=dict(rule_id=rule_id))
 
+
 def retrieve_sentence_ids(rd, keys):
     ret = []
     for key in keys:
         rd.set('tmp', rd.get(key))
         while(True):
             pos = rd.bitpos('tmp', 1)
-            if pos < 0: break
+            if pos < 0:
+                break
             ret.append(int(pos))
             rd.setbit('tmp', pos, 0)
         rd.delete('tmp')
     return ret
+
 
 def is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
     previous_word_id = rule_word_ids[0]
@@ -673,7 +700,7 @@ def is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
         rule_word_id = rule_word_ids[i]
         sentence_word_id = sentence_word_ids[j]
         if sentence_word_id == rule_word_id:
-            if i == 0  or word_seqs[j] - previous_position <= gap:
+            if i == 0 or word_seqs[j] - previous_position <= gap:
                 previous_word_id = rule_word_id
                 previous_position = word_seqs[j]
                 i += 1
@@ -689,9 +716,11 @@ def is_valid_sentences(gap, rule_word_ids, word_seqs, sentence_word_ids):
     else:
         return False
 
+
 @app.errorhandler(Exception)
 def internal_error(exception):
     app.logger.error(exception)
+
 
 @app.route('/_analysis', methods=['POST'])
 def analysis():
@@ -703,7 +732,9 @@ def analysis():
         fromDate = format_fromDate(ast.literal_eval(request.form['fromDate']))
         toDate = format_toDate(ast.literal_eval(request.form['toDate']))
 
-        app.logger.info('POST anaysis: topic(%s), sources_ids(%s)'%('%s', source_format_string)%tuple([topic]+sources_ids))
+        app.logger.info('POST anaysis: topic(%s), sources_ids(%s)'
+                        % ('%s', source_format_string)
+                        % tuple([topic] + sources_ids))
 
         analyze(topic, sources_ids)
 
@@ -714,7 +745,7 @@ def analysis():
         from_post_rnum = (page-1)*config['perpage']
         post_ruleset_count_dic = get_post_ruleset_count_dic(cur, topic, sources_ids, from_post_rnum, config['perpage'], fromDate, toDate)
 
-    return jsonify(rule_count_dic           = rule_count_dic,\
+    return jsonify(rule_count_dic           = rule_count_dic,
                    post_ruleset_count_dic   = post_ruleset_count_dic)
 
 if __name__ == '__main__':
