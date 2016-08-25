@@ -141,12 +141,13 @@ def store_posts(topic_name, source_name, source):
     files = os.listdir(dirname)
     files.sort()
     for filename in files:
-        logging('inserting file: %s' % filename)
 
         # skip already-inserted files
         if '.'.join(filename.split('.')[0:-1]) in posts:
             logging('%s is already exists' % filename)
             continue
+
+        logging('inserting file: %s' % filename)
 
         f = open(os.path.join(dirname, filename))
         lines = parsing.convert_textfile_to_lines(f)
@@ -155,9 +156,11 @@ def store_posts(topic_name, source_name, source):
         lines = lines[1:]
         timestamp = ' '.join(filename.split(' - ')[1].split(' ')[0:2])
 
+        logging('start sentencing')
         sentences = parsing.do_sentencing_without_threading(lines)
         morphs_list = {}
 
+        logging('start parsing')
         for i in range(len(sentences)):
             sentence = sentences[i]
             morphs = map(parsing.concate_tuple, parsing.do_parsing_without_threading(sentence))
