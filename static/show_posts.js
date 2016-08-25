@@ -212,7 +212,8 @@ var show_posts = function(posts){
             data: {
                 'topic': topic,
                 'sources':JSON.stringify(sources),
-                'post_id': post_id
+                'post_id': post_id,
+
             },
             dataType: 'JSON',
             success: function(data){
@@ -391,7 +392,9 @@ var show_rules = function(ruleset_rules_dic, rule_count_dic){
                 'topic': topic,
                 'sources': JSON.stringify(sources),
                 'isRuleset': isRuleset,
-                'rule_id' : idx
+                'rule_id' : idx,
+				'fromDate': JSON.stringify(fromDate),
+				'toDate': JSON.stringify(toDate)
             },
             dataType: 'JSON',
             success: function(data){
