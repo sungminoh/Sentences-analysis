@@ -173,6 +173,8 @@ def store_posts(topic_name, source_name, source):
             logging('........ done')
         else:
             logging('........ fail')
+    logging('python insertDB.py (done)')
 
 if __name__ == '__main__':
-    store_posts(u'자살', 'twitter 08', 'posts_08')
+    # store_posts(u'자살', 'twitter 09', 'posts_09')
+    store_posts(u'자살', 'twitter 10', 'posts_10')

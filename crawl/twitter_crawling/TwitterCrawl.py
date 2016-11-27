@@ -14,7 +14,7 @@ os.chdir('/home/zenixwp/Sentences-analysis/crawl/twitter_crawling')
 flogname = './log/crawl.log'
 destdir = './posts'
 today = date.today() - timedelta(1)
-yesterday = today - timedelta(2)
+yesterday = today - timedelta(1)
 daterange = [yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')]
 month = yesterday.month
 monthstr = '0' + str(month) if month < 10 else str(month)

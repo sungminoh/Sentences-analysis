@@ -74,3 +74,10 @@ coverage.xml
 ehthumbs.db
 Thumbs.db
 
+
+# Security #
+############
+./modules/database.py
+./crawl/twitter_crawling/twitter_keys.py
+
+csv/

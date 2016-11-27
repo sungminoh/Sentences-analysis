@@ -85,25 +85,32 @@ def formatstring(arr):
     else:
         return '%s'
 
-def analyze(topic=None, sources_ids=None):
-    cputime = time()
+
+def get_post_until(topic=None, sources_ids=None):
     format_string = '%s'
     if sources_ids:
         format_string = formatstring(sources_ids)
+    with connect_db() as cur:
+        if topic:
+            cur.execute(queries['get_max_post_by_cond'] % ('%s', format_string), [topic]+sources_ids)
+        else:
+            cur.execute(queries['get_max_post'])
+        post_until = int(cur.fetchall()[0][0])
+        return post_until
 
-    db = connect_db()
-    cur = db.cursor()
-    if topic:
-        cur.execute(queries['get_max_post_by_cond'] % ('%s', format_string), [topic]+sources_ids)
-    else:
-        cur.execute(queries['get_max_post'])
-    post_until = int(cur.fetchall()[0][0])
+
+def get_rule_words():
+    with connect_db() as cur:
+        cur.execute(queries['get_rule_words'])
+        return cur.fetchall()
 
 
-    cur.execute(queries['get_rule_words'])
-    db.close()
+def analyze(topic=None, sources_ids=None):
+    cputime = time()
 
-    for row_rule in cur.fetchall():
+    post_until = get_post_until(topic, sources_ids)
+
+    for row_rule in get_rule_words():
         rd = connect_rd()
         db = connect_db()
         cur = db.cursor()
@@ -115,7 +122,7 @@ def analyze(topic=None, sources_ids=None):
 
         last_post_id = 0
         if rd.exists(rule_id):
-            last_post_id = rd.get(rule_id)
+            last_post_id = int(rd.get(rule_id))
 
         cur.execute(queries['get_sentence_words']\
                     %('%s', '%s', rule_word_id_format_string, rule_word_id_format_string, '%s'),\
@@ -133,13 +140,14 @@ def analyze(topic=None, sources_ids=None):
         db.close()
         post_until = max(post_until, last_post_id)
         rd.set(rule_id, post_until)
-        # logging ('rule(%s) post(%s, %s) takes %s'\
-                 # % (str(rule_id), str(last_post_id), str(post_until), str(time()-cputime)))
+        logging ('rule(%s) post(%s, %s) takes %s'\
+                 % (str(rule_id), str(last_post_id), str(post_until), str(time()-cputime)))
     logging ('run until post_id %s, takes %s seconds' % (post_until, str(time()-cputime)))
 
 if __name__ == '__main__':
     while(True):
         logging ('analyze start!!!')
         analyze()
+        logging ('sleep')
         sleep(60*20)
 
