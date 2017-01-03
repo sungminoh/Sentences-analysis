@@ -21,22 +21,22 @@ from database_info import mysql_info, redis_info
 import jpype
 from time import time
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static', static_folder='static')
 # app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
 # app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
 # celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 # celery.conf.update(app.config)
 
 # Should be modified later. this is just from tutorial.
-app.config.update(dict(
-    DATABASE = '/tmp/morpheme.db',
-    DEBUG = True,
-    SECRET_KEY = 'development key',
-    USERNAME = 'admin',
-    PASSWORD = 'default'
-    ))
+# app.config.update(dict(
+    # DATABASE = '/tmp/morpheme.db',
+    # DEBUG = True,
+    # SECRET_KEY = 'development key',
+    # USERNAME = 'admin',
+    # PASSWORD = 'default'
+    # ))
 
-app.config.from_envvar('FLASK_SETTINGS', silent=True)
+# app.config.from_envvar('FLASK_SETTINGS', silent=True)
 
 config = dict(
     perpage   =   10
@@ -308,6 +308,17 @@ def build_redis():
     pipe.execute()
 
 
+def refresh_redis(rd):
+    key_in_redis = set(rd.keys())
+    db = connect_db()
+    cur = db.cursor()
+    cur.execute('SELECT _id FROM rules;')
+    key_in_db = map(lambda x: str(x[0]), cur.fetchall())
+    for key_only_in_redis in key_in_redis.difference(key_in_db):
+        rd.delete(key_only_in_redis)
+    db.close()
+
+
 def tuplize(s):
     return (s,)
 
@@ -431,6 +442,7 @@ def get_rule_count_dic(cur, topic, sources_ids, fromDate, toDate):
     format_string = formatstring(sources_ids)
     cur.execute(queries['get_all_rules'], (topic, ))
     rd = g.rd
+    refresh_redis(rd)
     rule_count_dic = {k: 0 for k in map(long, rd.keys())}
 
     cur.execute(queries['get_result_by_rule'].format(fromDate, toDate)
@@ -757,5 +769,5 @@ if __name__ == '__main__':
     handler.setLevel(logging.INFO)
     handler.setFormatter(formatter)
     app.logger.addHandler(handler)
-    # app.run(debug=True)
-    app.run()
+    app.run(debug=True)
+    # app.run()
