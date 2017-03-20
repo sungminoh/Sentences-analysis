@@ -3,6 +3,7 @@ import tweepy as tw
 from time import strftime, sleep
 from datetime import date, timedelta
 import os
+import errno
 from twitter_keys import get_access_token, get_access_token_secret, get_consumer_key, get_consumer_secret
 
 access_token = get_access_token()
@@ -18,10 +19,13 @@ yesterday = today - timedelta(1)
 daterange = [yesterday.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')]
 month = yesterday.month
 monthstr = '0' + str(month) if month < 10 else str(month)
-targetdir = 'posts_' + monthstr
+year = yesterday.year
+yearstr = '0' + str(year) if year< 10 else str(year)
+targetdir = 'posts_%s_%s' % (year, monthstr)
 destdir = os.path.join(destdir, targetdir)
-# dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(12, 14))
-# daterange = ['2016-08-%s' % date for date in dates]
+
+# dates = map(lambda x: '0'+str(x) if x < 10 else str(x), range(1, 8))
+# daterange = ['2017-02-%s' % date for date in dates]
 
 
 def logging(text):
@@ -38,6 +42,12 @@ def save_texts(texts, created_ats):
     del created_ats[:]
 
     # write
+    try:
+        os.mkdir(destdir)
+    except OSError as err:
+        if err.errno == errno.EEXIST and os.path.isdir(destdir):
+            pass
+
     fname = os.path.join(destdir, '%s.txt' % created_range)
     if os.path.isfile(fname):
         logging('%s is alread exists' % fname)

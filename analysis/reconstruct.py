@@ -74,12 +74,12 @@ def retrieve_full_sentence(lda_result_dic, fname):
 
 def main():
     # result_file = click.prompt('result file')
-    result_file = './csv/sentences_train_result.csv'
+    result_file = './csv170107/sentences_train_result.csv'
     # sentence_word_file = click.prompt('sentence_word file')
-    sentence_word_file = './csv/sentences_train.csv'
+    sentence_word_file = './csv170107/sentences_train.csv'
     post_category_dic = build_post_category_dic(iter_csv(sentence_word_file))
     lda_result_dic = build_lda_result_dic(iter_csv(result_file), post_category_dic)
-    retrieve_full_sentence(lda_result_dic, './csv/sentences_train_text.csv')
+    retrieve_full_sentence(lda_result_dic, './sentences_train_text.csv')
 
 
 
